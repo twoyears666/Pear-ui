@@ -12,7 +12,7 @@
 
 **方式一（推荐）：应用内导入**
 
-1. 下载包目录内的 ZIP（如 [pcl2-totoro-blue/pcl2-totoro-blue.zip](pcl2-totoro-blue/pcl2-totoro-blue.zip)，点击 GitHub 上的文件 → Download raw file）
+1. 从 [Releases](../../releases) 下载对应包的 ZIP（如 [pcl2-totoro-blue.zip](../../releases/download/pcl2-totoro-blue-v1.0.0/pcl2-totoro-blue.zip)），也可直接下载包目录内的 ZIP（点击文件 → Download raw file）
 2. Pear 启动器 → 设置 → 界面引擎 → 切换到「材质包引擎」
 3. 欢迎界面点「导入 UI 包」→ 选择刚下载的 ZIP
 4. 导入成功立即生效；包安装到 `Documents/uipack/active`
