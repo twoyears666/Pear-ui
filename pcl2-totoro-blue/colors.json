@@ -1,34 +1,15 @@
 {
-  "accent": "#1173D4",
-  "background": {
-    "light": "#F5F5F5",
-    "dark": "#14181D"
-  },
-  "sidebar": {
-    "light": "#268AED",
-    "dark": "#17324E"
-  },
-  "surface": {
-    "light": "#FFFFFFE8",
-    "dark": "#1E2630E8"
-  },
-  "surfaceElevated": {
-    "light": "#FFFFFF",
-    "dark": "#26303C"
-  },
-  "textPrimary": {
-    "light": "#35404B",
-    "dark": "#E8EDF4"
-  },
-  "textSecondary": {
-    "light": "#8C8C8C",
-    "dark": "#9AA5B1"
-  },
-  "border": {
-    "light": "#CCCCCC",
-    "dark": "#3A424E"
-  },
-  "selection": "#1173D424",
+  "topbar": "#0A5FC4",
+  "accent": "#0B84FF",
+  "sidebar": "#FFFFFF",
+  "textPrimary": "#333333",
+  "textSecondary": "#999999",
+  "cardBorder": "#D9E4F0",
+  "buttonBorder": "#C9D6E8",
+  "gradientFrom": "#E3EEF9",
+  "gradientTo": "#D5E5F5",
+  "white": "#FFFFFF",
+  "selection": "#0B84FF24",
   "success": "#1D9E28",
   "warning": "#D99B45",
   "danger": "#E0402B"

@@ -1,18 +1,18 @@
 # Pear-ui
 
-[Pear 启动器](https://github.com/twoyears666/pear)的 UI 材质包合集。每个子目录是一个独立可导入的 UI 包。
+[Pear 启动器](https://github.com/twoyears666/A-pear)的 UI 材质包合集。每个子目录是一个独立可导入的 UI 包。
 
 ## 包列表
 
 | 包 | 目录 | 版本 | 说明 |
 |---|---|---|---|
-| 龙猫蓝 | [pcl2-totoro-blue/](pcl2-totoro-blue/) | 1.0.0 | 经典蓝色主题：顶栏导航 + 左栏启动 |
+| PCL2 复刻 · 龙猫蓝 | [pcl2-totoro-blue/](pcl2-totoro-blue/) | 1.1.0 | 按《PCL II 复刻规格》1:1 还原：顶栏页签药丸 + 左栏账号/启动 + 渐变内容区 |
 
 ## 安装
 
 **方式一（推荐）：应用内导入**
 
-1. 从 [Releases](../../releases) 下载对应包的 ZIP（如 [pcl2-totoro-blue.zip](../../releases/download/pcl2-totoro-blue-v1.0.0/pcl2-totoro-blue.zip)），也可直接下载包目录内的 ZIP（点击文件 → Download raw file）
+1. 从 [Releases](../../releases) 下载对应包的 ZIP（如 [pcl2-totoro-blue.zip](../../releases/download/pcl2-totoro-blue-v1.1.0/pcl2-totoro-blue.zip)），也可直接下载包目录内的 ZIP（点击文件 → Download raw file）
 2. Pear 启动器 → 设置 → 界面引擎 → 切换到「材质包引擎」
 3. 欢迎界面点「导入 UI 包」→ 选择刚下载的 ZIP
 4. 导入成功立即生效；包安装到 `Documents/uipack/active`
@@ -46,11 +46,11 @@ function build(ui)
 end
 ```
 
-- 布局：`ui.row / ui.column / ui.panel / ui.nav / ui.content` + `ui.dimen({ phone = 170, pad = 300 })` 响应式尺寸
+- 布局：`ui.row / ui.column / ui.panel / ui.nav / ui.content` + `ui.dimen({ phone = 170, pad = 300 })` 响应式尺寸；`justify` / `crossAlign` 分布对齐、`width = "32%"` 百分比、`corner = "pill"` 药丸、`background = { from, to, angle }` 渐变
 - 叶子：`ui.button / ui.text / ui.image / ui.divider / ui.spacer`
-- 事件：`onReady` / `onAccountChange` / `onClick(id)`
-- API：`launcher.state`（只读状态）、`launcher.view(id):setText/setVisible/...`、`launcher.action(name)`
-- 动作白名单：`open:home/download/versionManager/settings/ai/mods/shaders/modpackImport/gameDirectory/accountManager/profileEditor/multiplayer`、`launch`（M4 接入）
+- 事件：`onReady` / `onAccountChange` / `onPageChange(page)` / `onClick(id)`
+- API：`launcher.state`（只读状态）、`launcher.view(id):setText/setVisible/setStyle/...`、`launcher.action(name)`
+- 动作白名单：`open:home/download/versionManager/settings/ai/mods/shaders/modpackImport/gameDirectory/accountManager/profileEditor/multiplayer`、`launch`（已接通真实启动链路）
 - 颜色：`#RRGGBB` 直写或 `$color:token` 引用主题令牌；图片：`sf:SymbolName`（SF Symbols）或 `$image:token`
 
 完整引擎文档见 Pear 主仓库 `Natives/` 目录源码与 `tests/test_uipack_contracts.py` 契约测试。
