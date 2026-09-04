@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "id": "pcl2-totoro-blue",
+  "name": "PCL2 龙猫蓝",
+  "author": "Pear",
+  "version": "1.0.0",
+  "entry": "main.lua",
+  "colors": "colors.json"
+}
