@@ -12,7 +12,7 @@
 
 **方式一（推荐）：应用内导入**
 
-1. 从 [Releases](../../releases) 下载对应包的 ZIP
+1. 下载包目录内的 ZIP（如 [pcl2-totoro-blue/pcl2-totoro-blue.zip](pcl2-totoro-blue/pcl2-totoro-blue.zip)，点击 GitHub 上的文件 → Download raw file）
 2. Pear 启动器 → 设置 → 界面引擎 → 切换到「材质包引擎」
 3. 欢迎界面点「导入 UI 包」→ 选择刚下载的 ZIP
 4. 导入成功立即生效；包安装到 `Documents/uipack/active`
@@ -25,6 +25,7 @@
 
 ```
 <包目录>/
+  <包id>.zip      # 可导入的 ZIP（内含 manifest.json + main.lua + colors.json）
   manifest.json   # schemaVersion: 2，id/name/author/entry
   main.lua        # describe() + build(ui) 布局树 + 事件回调
   colors.json     # 颜色令牌（放入 themes/ 时作用于原生页面）
@@ -56,4 +57,4 @@ end
 
 ## 收录新包
 
-欢迎通过 Pull Request 收录新包：新建子目录（目录名 = 包 id），包含 `manifest.json` / `main.lua` / `colors.json`，并同步更新上方包列表与发布 Release ZIP。
+欢迎通过 Pull Request 收录新包：新建子目录（目录名 = 包 id），包含可导入的 `<包id>.zip`（ZIP 内为 `manifest.json` / `main.lua` / `colors.json`）及这三份源文件，并同步更新上方包列表。
