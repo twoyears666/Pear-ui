@@ -58,12 +58,14 @@ local function capsule(id, label, selected)
 end
 
 function describe()
-  return { name = "PCL II 复刻", author = "Pear", version = "1.1.0" }
+  return { name = "PCL II 复刻", author = "Pear", version = "1.1.1" }
 end
 
 function build(ui)
   return ui.column {
     id = "shell",
+    -- stretch：顶栏/页面行宽度铺满（缺省按内容测量会导致整链坍缩成窄条）
+    crossAlign = "stretch",
     children = {
       -- ===== 一、顶栏（通栏蓝 #0A5FC4，高 ≈ 0.085H）=====
       ui.row {
@@ -97,6 +99,7 @@ function build(ui)
       ui.row {
         id = "page",
         weight = 1,
+        crossAlign = "stretch",   -- 左栏/内容区高度铺满（否则内容区高 0 黑屏）
         children = {
           ui.column {
             id = "left",
