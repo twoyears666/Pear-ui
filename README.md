@@ -6,13 +6,13 @@
 
 | 包 | 目录 | 版本 | 说明 |
 |---|---|---|---|
-| PCL2 复刻 · 龙猫蓝 | [pcl2-totoro-blue/](pcl2-totoro-blue/) | 1.2.0 | 按《PCL II 复刻规格》1:1 还原：顶栏页签药丸 + 左栏账号/启动 + 渐变内容区；v1.2.0 黑边根治、五页签导航、半透明背景 |
+| PCL2 复刻 · 浅色 | [pcl2-totoro-blue/](pcl2-totoro-blue/) | 1.4.0 | 仿 PCL 浅色主题：蓝色顶栏 + 浅蓝灰渐变背景 + 白底描边卡片 + 启动页左右分栏；v1.4.0 由深色重绘为浅色，首页/下载/联机/设置/更多五页完整实现 |
 
 ## 安装
 
 **方式一（推荐）：应用内导入**
 
-1. 从 [Releases](../../releases) 下载对应包的 ZIP（如 [pcl2-totoro-blue.zip](../../releases/download/pcl2-totoro-blue-v1.2.0/pcl2-totoro-blue.zip)），也可直接下载包目录内的 ZIP（点击文件 → Download raw file）
+1. 从 [Releases](../../releases) 下载对应包的 ZIP（如 [pcl2-totoro-blue.zip](../../releases/download/pcl2-totoro-blue-v1.4.0/pcl2-totoro-blue.zip)），也可直接下载包目录内的 ZIP（点击文件 → Download raw file）
 2. Pear 启动器 → 设置 → 界面引擎 → 切换到「材质包引擎」
 3. 欢迎界面点「导入 UI 包」→ 选择刚下载的 ZIP
 4. 导入成功立即生效；包安装到 `Documents/uipack/active`
