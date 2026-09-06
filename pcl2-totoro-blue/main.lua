@@ -54,6 +54,62 @@ local PAGE_TAB = {
   settings = "tab.setup", more = "tab.other",
 }
 
+-- ===== UI 包配置表（WS-E）：所有页面条目的单一数据源 ====
+-- 新增页面/页签/下载项/房间/更多条目 = 只在此加一条，构建器与引擎零改动。
+local CONFIG = {
+  -- 页 token → Lua 页子树 id（content 节点据此解析 navigate/open）
+  pages = {
+    home = "pageHome", download = "pageDownload", multi = "pageMulti",
+    settings = "pageSettings", more = "pageMore",
+    version_settings = "pageVersionSettings",
+  },
+  -- 顶栏页签（即 TABS）
+  tabs = TABS,
+  -- 下载页：两行分段标签 + 条目列
+  download = {
+    segments = { "全部", "正式版", "快照", "Mods", "光影", "整合包" },
+    subSegments = { "下载", "已购", "收藏", "历史" },
+    items = {
+      { icon = "sf:cube.fill",           color = C.green,  title = "最新 Java 版本", date = "更新于 ···", cat = "正式版", action = "open:download" },
+      { icon = "sf:gamecontroller.fill", color = C.purple, title = "光影整合包",     date = "更新于 ···", cat = "光影",   action = "open:download" },
+      { icon = "sf:map.fill",            color = C.cyan,   title = "地图资源合集",   date = "更新于 ···", cat = "地图",   action = "open:download" },
+    },
+  },
+  -- 联机页 · 加入房间列表（右端状态文字 = 深色）
+  online = {
+    rooms = {
+      { icon = "sf:person.3.fill", title = "联机大厅 · 生存", sub = "房主 · 24ms", status = "可加入", action = "open:multiplayer" },
+      { icon = "sf:person.3.fill", title = "光影测试房间",     sub = "房主 · 68ms", status = "可加入", action = "open:multiplayer" },
+    },
+  },
+  -- 更多页分组（right: "chevron" | "version"）
+  moreGroups = {
+    { name = "启动", rows = {
+        { id = "moreLaunch", icon = "sf:play.rectangle.fill", label = "启动选项", right = "chevron", action = "open:settings" },
+    } },
+    { name = "资源", rows = {
+        { id = "moreDefaultVersion", icon = "sf:cube.fill", label = "默认版本", right = "version", action = "open:versionManager" },
+        { id = "moreMods", icon = "sf:hud", label = "资源中心", right = "chevron", action = "open:mods" },
+        { id = "moreVersions", icon = "sf:square.grid.3x3.fill", label = "版本管理", right = "chevron", action = "open:versionManager" },
+    } },
+    { name = "个性化", rows = {
+        { id = "moreSaves", icon = "sf:tray.full.fill", label = "存档管理", right = "chevron", action = "open:gameDirectory" },
+        { id = "moreTheme", icon = "sf:paintbrush.fill", label = "主题材质包", right = "chevron", action = "open:settings" },
+        { id = "moreWall", icon = "sf:photo.on.rectangle.fill", label = "壁纸设置", right = "chevron", action = "open:settings" },
+    } },
+    { name = "关于", rows = {
+        { id = "moreAbout", icon = "sf:info.circle.fill", label = "软件信息", right = "chevron", action = "open:settings" },
+        { id = "moreLicense", icon = "sf:doc.text.fill", label = "开源协议", right = "chevron", action = "open:settings" },
+        { id = "moreFeedback", icon = "sf:exclamationmark.bubble.fill", label = "问题反馈", right = "chevron", action = "open:settings" },
+        { id = "moreVersion", icon = "sf:v.circle.fill", label = "版本号", right = "version", action = "open:settings" },
+    } },
+  },
+}
+
+-- 兼容旧引用：resetDownloadSegments 仍读 DL1/DL2；直接指向配置表保证单一数据源。
+local DL1 = CONFIG.download.segments
+local DL2 = CONFIG.download.subSegments
+
 -- ===== 构建器（复用节点）=====
 
 local function topTab(t)
@@ -280,13 +336,11 @@ local function buildHomePage()
   }
 end
 
--- 下载页：两行分段标签（文字式白底选中态）+ 搜索条 + 条目列
-local DL1 = { "全部", "正式版", "快照", "Mods", "光影", "整合包" }
-local DL2 = { "下载", "已购", "收藏", "历史" }
+-- 下载页：两行分段标签（文字式白底选中态）+ 搜索条 + 条目列（清单来自 CONFIG.download）
 local function buildDownloadPage()
   -- 第一行分段标签（6 项等分），选中白底全圆药丸 + 深色文字
   local seg1 = {}
-  for i, name in ipairs(DL1) do
+  for i, name in ipairs(CONFIG.download.segments) do
     seg1[#seg1 + 1] = ui.button {
       id = "dl1." .. i, label = name, weight = 1, height = "5vh", corner = "pill",
       style = { background = C.transparent, tint = C.mid, font = "2.4vh" },
@@ -294,11 +348,16 @@ local function buildDownloadPage()
   end
   -- 第二行分段标签（4 项等分），选中白底圆角横条 + 深色文字
   local seg2 = {}
-  for i, name in ipairs(DL2) do
+  for i, name in ipairs(CONFIG.download.subSegments) do
     seg2[#seg2 + 1] = ui.button {
       id = "dl2." .. i, label = name, weight = 1, height = "5.5vh", corner = "1vh",
       style = { background = C.transparent, tint = C.mid, font = "2.4vh" },
     }
+  end
+  -- 条目列：一条一卡，全部整行可点击
+  local items = { inputBar("dlSearch", "sf:magnifyingglass", "搜索内容…", "sf:slider.horizontal.3", "open:download") }
+  for i, it in ipairs(CONFIG.download.items) do
+    pushAll(items, { listEntry("dlItem" .. i, it.icon, it.color, it.title, it.date, it.cat, C.mid, it.action) })
   end
   return ui.column {
     id = "pageDownload", weight = 1, crossAlign = "center",
@@ -306,10 +365,7 @@ local function buildDownloadPage()
     children = {
       ui.row { id = "dlSeg1", width = "94%", spacing = "1vh", children = seg1 },
       ui.row { id = "dlSeg2", width = "94%", spacing = "1vh", children = seg2 },
-      inputBar("dlSearch", "sf:magnifyingglass", "搜索内容…", "sf:slider.horizontal.3", "open:download"),
-      listEntry("dlItem1", "sf:cube.fill", C.green,  "最新 Java 版本", "更新于 ···", "正式版", C.mid, "open:download"),
-      listEntry("dlItem2", "sf:gamecontroller.fill", C.purple, "光影整合包", "更新于 ···", "光影", C.mid, "open:download"),
-      listEntry("dlItem3", "sf:map.fill", C.cyan,  "地图资源合集", "更新于 ···", "地图", C.mid, "open:download"),
+      unpack(items),
     },
   }
 end
@@ -328,6 +384,11 @@ local function multiTextTab(id, label, action)
 end
 
 local function buildMultiPage()
+  -- 加入房间：房间列表来自 CONFIG.online.rooms
+  local rooms = {}
+  for i, r in ipairs(CONFIG.online.rooms) do
+    pushAll(rooms, { listEntry("roomItem" .. i, r.icon, C.accent, r.title, r.sub, r.status, C.dark, r.action) })
+  end
   local joinBranch = ui.column {
     id = "joinBranch", width = "94%", crossAlign = "stretch", spacing = "1.5vh",
     children = {
@@ -341,8 +402,7 @@ local function buildMultiPage()
           ui.text { text = "输入对方分享的房间连接码即可加入", style = { font = "2.4vh", color = C.mid } },
         },
       },
-      listEntry("roomItem1", "sf:person.3.fill", C.accent, "联机大厅 · 生存", "房主 · 24ms", "可加入", C.dark, "open:multiplayer"),
-      listEntry("roomItem2", "sf:person.3.fill", C.accent, "光影测试房间", "房主 · 68ms", "可加入", C.dark, "open:multiplayer"),
+      unpack(rooms),
     },
   }
   -- 创建房间：白底表单卡 + 底部实心蓝主按钮
@@ -404,10 +464,10 @@ local function buildMultiPage()
 end
 
 -- 设置页：版本信息卡 + 设置条目（带可选的灰色说明小字）
-local function settingsEntry(id, icon, label, desc)
+local function settingsEntry(id, icon, label, desc, action)
   local nodes = {
     ui.row { id = id, height = "7vh", corner = "1.2vh", background = C.card, border = BORDER, shadow = SHADOW,
-      action = "open:settings", hoverColor = C.hover,
+      action = action or "open:settings", hoverColor = C.hover,
       crossAlign = "center", padding = { left = "3vh", right = "2.5vh" }, spacing = "1.5vh",
       children = {
         ui.image { icon = icon, size = "3vh", style = { tint = C.accent } },
@@ -421,7 +481,11 @@ local function settingsEntry(id, icon, label, desc)
   return nodes
 end
 
+-- 设置页：条目清单由启动器经 launcher.state.settings 提供（启动器新增设置无需改包）。
+-- build() 期间 launcher.state 已在 buildTree 前注入，故此处可安全读取。
 local function buildSettingsPage()
+  local list = launcher.state and launcher.state.settings
+  if type(list) ~= "table" then list = {} end
   local children = {
     -- 版本信息卡
     ui.row {
@@ -443,14 +507,21 @@ local function buildSettingsPage()
       },
     },
   }
-  pushAll(children, settingsEntry("setLauncher", "sf:slider.horizontal.3", "启动器设置", ""))
-  pushAll(children, settingsEntry("setMirror", "sf:arrow.down.circle.fill", "下载镜像策略", ""))
-  pushAll(children, settingsEntry("setVideo", "sf:display", "视频设置", "最大分辨率、垂直同步与渲染占比等显示选项。"))
-  pushAll(children, settingsEntry("setGL", "sf:memorychip.fill", "MobileGlues 渲染器", "选择 OpenGL 兼容层，可能影响画面表现与性能。"))
-  pushAll(children, settingsEntry("setKeys", "sf:keyboard.fill", "自定义控制键", ""))
-  pushAll(children, settingsEntry("setJava", "sf:wrench.and.screwdriver.fill", "Java 调整", ""))
-  pushAll(children, settingsEntry("setUI", "sf:paintbrush.fill", "UI 设置", "界面缩放与视觉效果，可导入主题材质包调整外观。"))
-  pushAll(children, settingsEntry("setAi", "sf:sparkles", "AI 助手", ""))
+  -- 由启动器数据驱动；每一条都调用同一 settingsEntry 组件（引擎零页面特例）。
+  if #list > 0 then
+    for i, s in ipairs(list) do
+      pushAll(children, settingsEntry(
+        "set" .. i,
+        s.icon or "sf:gearshape.fill",
+        s.label ~= nil and s.label or "",
+        s.desc or "",
+        s.action
+      ))
+    end
+  else
+    -- 引擎未提供列表时的结构占位（仅描述结构，不写死条目）
+    pushAll(children, settingsEntry("setEmpty", "sf:gearshape.fill", "设置", "启动器暂未提供设置条目。", "open:settings"))
+  end
   return ui.column {
     id = "pageSettings", weight = 1, crossAlign = "center",
     padding = { top = "1.5vh", bottom = "1.5vh" }, spacing = "3vh",
@@ -472,25 +543,15 @@ local function buildMorePage()
   local children = {
     ui.text { id = "moreTitle", text = "更多", style = { font = "4vh", weight = "bold", color = C.dark } },
   }
-  pushAll(children, group("启动", {
-    rowItem("moreLaunch", "sf:play.rectangle.fill", C.accent, "启动选项", chevron(), "open:settings"),
-  }))
-  pushAll(children, group("资源", {
-    rowItem("moreDefaultVersion", "sf:cube.fill", C.accent, "默认版本", versionLabel(), "open:versionManager"),
-    rowItem("moreMods", "sf:hud", C.accent, "资源中心", chevron(), "open:mods"),
-    rowItem("moreVersions", "sf:square.grid.3x3.fill", C.accent, "版本管理", chevron(), "open:versionManager"),
-  }))
-  pushAll(children, group("个性化", {
-    rowItem("moreSaves", "sf:tray.full.fill", C.accent, "存档管理", chevron(), "open:gameDirectory"),
-    rowItem("moreTheme", "sf:paintbrush.fill", C.accent, "主题材质包", chevron(), "open:settings"),
-    rowItem("moreWall", "sf:photo.on.rectangle.fill", C.accent, "壁纸设置", chevron(), "open:settings"),
-  }))
-  pushAll(children, group("关于", {
-    rowItem("moreAbout", "sf:info.circle.fill", C.accent, "软件信息", chevron(), "open:settings"),
-    rowItem("moreLicense", "sf:doc.text.fill", C.accent, "开源协议", chevron(), "open:settings"),
-    rowItem("moreFeedback", "sf:exclamationmark.bubble.fill", C.accent, "问题反馈", chevron(), "open:settings"),
-    rowItem("moreVersion", "sf:v.circle.fill", C.accent, "版本号", versionLabel(), "open:settings"),
-  }))
+  -- 分组清单来自 CONFIG.moreGroups；右端 right 决定即时 rightSpec（chevron / versionLabel）
+  for _, g in ipairs(CONFIG.moreGroups) do
+    local rows = {}
+    for _, r in ipairs(g.rows) do
+      local rightSpec = (r.right == "version") and versionLabel() or chevron()
+      pushAll(rows, { rowItem(r.id, r.icon, C.accent, r.label, rightSpec, r.action) })
+    end
+    pushAll(children, group(g.name, rows))
+  end
   return ui.column {
     id = "pageMore", weight = 1, crossAlign = "center",
     padding = { top = "1.5vh", bottom = "1.5vh" }, spacing = "3vh",
@@ -801,12 +862,8 @@ function build(ui)
             weight = 1,
             initialPage = "home",
             background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
-            -- 页 token → Lua 页子树 id（引擎据此解析 navigate/open 目标，零硬编码页面名）
-            pages = {
-              home = "pageHome", download = "pageDownload", multi = "pageMulti",
-              settings = "pageSettings", more = "pageMore",
-              version_settings = "pageVersionSettings",
-            },
+            -- 页 token → Lua 页子树 id（引擎据此解析 navigate/open，零硬编码页面名）
+            pages = CONFIG.pages,
             children = {
               buildHomePage(),
               buildDownloadPage(),
