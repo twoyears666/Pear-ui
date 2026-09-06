@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.9.0" }
+  return { name = "PCL 浅色", version = "1.10.0" }
 end
 
 local C = {
