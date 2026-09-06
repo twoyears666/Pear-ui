@@ -232,7 +232,7 @@ local function buildHomePage()
           },
         },
       },
-      -- 导航双卡行 1：整合包（青）/ 光影（橙）
+      -- 导航双卡行 1：整合包（紫）/ 光影（橙）
       ui.row {
         id = "homeNavRow1", width = "94%", height = "9vh", spacing = "2vh",
         children = {
@@ -240,7 +240,7 @@ local function buildHomePage()
             action = "open:modpackImport", hoverColor = C.hover,
             crossAlign = "center", padding = { left = "2vh", right = "2vh" }, spacing = "1.2vh",
             children = {
-              ui.image { icon = "sf:square.2.layers.3d.fill", size = "4.5vh", style = { tint = C.cyan } },
+              ui.image { icon = "sf:square.2.layers.3d.fill", size = "4.5vh", style = { tint = C.purple } },
               ui.text { text = "整合包", weight = 1, style = { font = "2.8vh", weight = "bold", color = C.dark } },
               ui.text { text = "›", style = { font = "3vh", color = C.mid } },
             } },
@@ -254,7 +254,7 @@ local function buildHomePage()
             } },
         },
       },
-      -- 导航双卡行 2：资源中心（紫）/ 壁纸（粉）
+      -- 导航双卡行 2：资源中心（青）/ 壁纸（粉）
       ui.row {
         id = "homeNavRow2", width = "94%", height = "9vh", spacing = "2vh",
         children = {
@@ -262,7 +262,7 @@ local function buildHomePage()
             action = "open:mods", hoverColor = C.hover,
             crossAlign = "center", padding = { left = "2vh", right = "2vh" }, spacing = "1.2vh",
             children = {
-              ui.image { icon = "sf:cube.fill", size = "4.5vh", style = { tint = C.purple } },
+              ui.image { icon = "sf:cube.fill", size = "4.5vh", style = { tint = C.cyan } },
               ui.text { text = "资源中心", weight = 1, style = { font = "2.8vh", weight = "bold", color = C.dark } },
               ui.text { text = "›", style = { font = "3vh", color = C.mid } },
             } },
@@ -498,6 +498,151 @@ local function buildMorePage()
   }
 end
 
+-- ===== 二级页：版本设置（由 open:version_settings 进入）=====
+-- 顶部蓝栏（同顶栏色，自带返回 + 「— ✕」）+ 左导航 18% 白底（概览/设置/Mod管理/导出）
+-- + 右区渐变底纵向白卡片。
+local SUB_NAV = {
+  { id = "vs_nav_overview",  label = "概览" },
+  { id = "vs_nav_settings",  label = "设置" },
+  { id = "vs_nav_mods",      label = "Mod 管理" },
+  { id = "vs_nav_export",    label = "导出" },
+}
+
+-- 个性化卡 / 快捷方式卡 / 高级管理卡共用的普通白按钮
+local function plainButton(id, label)
+  return ui.button {
+    id = id, label = label, height = "5.5vh", corner = "1vh",
+    border = BORDER, style = { background = C.white, tint = C.dark, font = "2.4vh", weight = "bold" },
+  }
+end
+
+-- 下拉行：灰色标签 + 白底输入条（占行宽约 70%）
+local function pickerRow(id, label, valueText)
+  return ui.row {
+    id = id, crossAlign = "center", spacing = "2vh",
+    children = {
+      ui.text { text = label, style = { font = "2.4vh", color = C.mid } },
+      ui.spacer { weight = 1 },
+      ui.row {
+        id = id .. "Picker", width = "70%", height = "5.5vh", corner = "1vh",
+        background = C.white, border = BORDER, crossAlign = "center",
+        padding = { left = "2vh", right = "2vh" }, spacing = "1vh",
+        children = {
+          ui.text { text = valueText, weight = 1, style = { font = "2.4vh", color = C.dark } },
+          ui.image { icon = "sf:chevron.down", size = "2vh", style = { tint = C.accent } },
+        },
+      },
+    },
+  }
+end
+
+local function buildVersionSettingsPage()
+  -- 左导航四项（选中 = 蓝色加粗 + 左缘蓝色竖条）
+  local navItems = {}
+  for _, n in ipairs(SUB_NAV) do
+    navItems[#navItems + 1] = ui.row {
+      id = n.id, height = "7vh", action = n.id, crossAlign = "center",
+      padding = { left = "1.5vh", right = "1vh" }, spacing = "1.2vh",
+      children = {
+        ui.row { id = n.id .. "Bar", width = "0.6vh", height = "70%", background = C.accent },
+        ui.text { id = n.id .. "Label", text = n.label, weight = 1, style = { font = "2.6vh", color = C.mid, weight = "bold" } },
+      },
+    }
+  end
+  return ui.column {
+    id = "pageVersionSettings", weight = 1, crossAlign = "stretch", spacing = 0,
+    children = {
+      -- 顶部蓝栏（自带返回 + 页面标题 + 「— ✕」）
+      ui.row {
+        id = "vsTitlebar", height = "8.5vh", background = C.topbar, crossAlign = "center",
+        padding = { left = "2vh", right = "1.5vh" }, spacing = "1.5vh",
+        children = {
+          ui.row { id = "vsBack", action = "open:home", crossAlign = "center", spacing = "0.8vh",
+            children = {
+              ui.image { icon = "sf:chevron.left", size = "2.6vh", style = { tint = C.white } },
+              ui.text { text = "版本设置", style = { font = "3.2vh", weight = "bold", color = C.white } },
+            } },
+          ui.spacer { weight = 1 },
+          ui.image { id = "vsMin", icon = "sf:minus", size = "2.5vh", style = { tint = C.white } },
+          ui.image { id = "vsClose", icon = "sf:xmark", size = "2.5vh", style = { tint = C.white } },
+        },
+      },
+      -- 主体：左导航 18% + 右区卡片
+      ui.row {
+        id = "vsBody", weight = 1, crossAlign = "stretch", spacing = 0,
+        children = {
+          ui.column {
+            id = "vsNav", width = "18%", background = C.white, crossAlign = "stretch",
+            padding = { top = "2vh", bottom = "2vh" }, children = navItems,
+          },
+          ui.column {
+            id = "vsRight", weight = 1,
+            background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
+            padding = "3vh", spacing = "3vh", crossAlign = "stretch",
+            children = {
+              -- 1. 信息卡
+              ui.row {
+                id = "vsInfo", height = "12vh", corner = "1.2vh", background = C.card,
+                border = BORDER, shadow = SHADOW, crossAlign = "center",
+                padding = { left = "3vh", right = "3vh" }, spacing = "2vh",
+                children = {
+                  ui.image { icon = "sf:doc.text.fill", size = "6vh", style = { tint = C.accent } },
+                  ui.column {
+                    weight = 1, justify = "center", spacing = "0.4vh",
+                    children = {
+                      ui.text { text = "PCL 浅色 · 游戏版本", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+                      ui.text { text = "当前所选版本与启动配置信息", style = { font = "2.2vh", color = C.mid } },
+                    },
+                  },
+                },
+              },
+              -- 2. 个性化卡
+              ui.column {
+                id = "vsPersonalize", corner = "1.2vh", background = C.card,
+                border = BORDER, shadow = SHADOW, padding = "3vh", spacing = "2vh", crossAlign = "stretch",
+                children = {
+                  pickerRow("vsVer", "游戏版本", "选择版本…"),
+                  pickerRow("vsJava", "Java 版本", "选择 Java…"),
+                  ui.row { spacing = "2vh", children = {
+                    plainButton("vsMode1", "软渲染"),
+                    plainButton("vsMode2", "硬件加速"),
+                    plainButton("vsMode3", "高清修复"),
+                  } },
+                },
+              },
+              -- 3. 快捷方式卡
+              ui.row {
+                id = "vsShortcut", corner = "1.2vh", background = C.card,
+                border = BORDER, shadow = SHADOW, padding = "3vh", spacing = "2vh",
+                children = {
+                  plainButton("vsShort1", "创建桌面快捷方式"),
+                  plainButton("vsShort2", "创建菜单快捷方式"),
+                  plainButton("vsShort3", "管理启动参数"),
+                },
+              },
+              -- 4. 高级管理卡（两白按钮 + 一红字红边危险按钮）
+              ui.row {
+                id = "vsAdvanced", corner = "1.2vh", background = C.card,
+                border = BORDER, shadow = SHADOW, padding = "3vh", spacing = "2vh",
+                children = {
+                  plainButton("vsAdv1", "清理冗余文件"),
+                  plainButton("vsAdv2", "重置配置"),
+                  -- 危险操作：红字红边 #E5484D
+                  ui.button {
+                    id = "vsDanger", label = "删除版本", height = "5.5vh", corner = "1vh",
+                    border = { width = 1.5, color = C.danger },
+                    style = { background = C.white, tint = C.danger, font = "2.4vh", weight = "bold" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  }
+end
+
 -- ===== build：整树（顶栏蓝 + 启动页白左栏，其余页无侧栏）=====
 
 function build(ui)
@@ -522,6 +667,10 @@ function build(ui)
             crossAlign = "center",
             children = (function()
               local nodes = {}
+              -- 滑动高亮游标：白色全圆药丸，绝对定位铺在选中页签之下，随选中平滑滑动
+              nodes[#nodes + 1] = ui.row {
+                id = "tabCursor", absolute = true, background = C.white, corner = "pill",
+              }
               for _, t in ipairs(TABS) do nodes[#nodes + 1] = topTab(t) end
               return nodes
             end)(),
@@ -637,7 +786,7 @@ function build(ui)
                     style = { background = C.white, tint = C.dark, font = "2.4vh", weight = "bold" },
                   },
                   ui.button {
-                    id = "versionSetup", label = "版本设置", action = "open:profileEditor",
+                    id = "versionSetup", label = "版本设置", action = "open:version_settings",
                     weight = 1, height = "5.5vh", corner = "1vh",
                     border = BORDER,
                     style = { background = C.white, tint = C.dark, font = "2.4vh", weight = "bold" },
@@ -646,18 +795,25 @@ function build(ui)
               },
             },
           },
-          -- 内容区：浅蓝灰对角渐变底，承载 5 棵 Lua 页子树
+          -- 内容区：浅蓝灰对角渐变底，承载 Lua 页子树（含二级页）
           ui.content {
             id = "content",
             weight = 1,
             initialPage = "home",
             background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
+            -- 页 token → Lua 页子树 id（引擎据此解析 navigate/open 目标，零硬编码页面名）
+            pages = {
+              home = "pageHome", download = "pageDownload", multi = "pageMulti",
+              settings = "pageSettings", more = "pageMore",
+              version_settings = "pageVersionSettings",
+            },
             children = {
               buildHomePage(),
               buildDownloadPage(),
               buildMultiPage(),
               buildSettingsPage(),
               buildMorePage(),
+              buildVersionSettingsPage(),
             },
           },
         },
@@ -670,6 +826,17 @@ end
 
 local selectedTab = nil
 
+-- 让白色游标药丸平滑滑动到选中页签之下。
+-- 游标与页签同为 topbar 内 tabs 行的直接子节点，getFrame 返回同一坐标系。
+-- 药丸高取页签高的 5/6（≈0.05H），垂直居中；frame 未就绪时静默跳过。
+local function moveCursorTo(tabId)
+  local f = launcher.view(tabId):getFrame()
+  if not f or not f.w or f.w == 0 or not f.h or f.h == 0 then return end
+  local pillH = f.h * (5 / 6)
+  launcher.view("tabCursor"):setFrame(
+    { x = f.x, y = f.y + (f.h - pillH) / 2, w = f.w, h = pillH }, true)
+end
+
 local function selectTab(tabId)
   selectedTab = tabId
   for _, t in ipairs(TABS) do
@@ -678,6 +845,7 @@ local function selectTab(tabId)
       and { background = C.white, tint = C.accent }
       or  { background = C.transparent, tint = C.white })
   end
+  moveCursorTo(tabId)
 end
 
 -- 下载页分段标签选中态
@@ -733,11 +901,39 @@ function onAccountChange(account)
   refreshAccount(account)
 end
 
+-- 二级页左导航选中态（蓝色加粗 + 左缘蓝色竖条）
+local selectedSubNav = nil
+local function selectedSubNavId()
+  return selectedSubNav or SUB_NAV[1].id
+end
+
 function onPageChange(page)
-  local tabId = PAGE_TAB[page]
-  if tabId then selectTab(tabId) end
+  local isSub = (page == "version_settings")
+  -- 二级页隐藏主顶栏（自带返回蓝栏）；其余页恢复主顶栏
+  launcher.view("titlebar"):setVisible(not isSub)
+  if isSub then
+    if not selectedSubNav then selectSubNav(selectedSubNavId()) end
+  else
+    local tabId = PAGE_TAB[page]
+    if tabId then selectTab(tabId) end
+  end
   -- 仅启动页显示白左栏；其余页左栏坍缩、内容整幅铺开
   launcher.view("left"):setVisible(page == "home")
+end
+
+function selectSubNav(id)
+  selectedSubNav = id
+  for _, n in ipairs(SUB_NAV) do
+    local sel = (n.id == id)
+    launcher.view(n.id .. "Bar"):setVisible(sel)
+    launcher.view(n.id .. "Label"):setStyle(sel and { tint = C.accent } or { tint = C.mid })
+  end
+end
+
+-- 首个布局完成后被引擎调用：游标等依赖真实 frame 的定位此时才有坐标可读。
+-- 幂等：只是把游标再对准当前选中页签。
+function onLayout()
+  if selectedTab then selectTab(selectedTab) end
 end
 
 function onClick(id)
@@ -760,4 +956,8 @@ function onClick(id)
   if id == "multiJoin" then showMultiBranch(true) end
   if id == "multiCreate" then showMultiBranch(false) end
   if id == "createRoomBtn" then showMultiBranch(false) end
+  -- 二级页左导航
+  for _, n in ipairs(SUB_NAV) do
+    if n.id == id then selectSubNav(n.id); return end
+  end
 end
