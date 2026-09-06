@@ -1,4 +1,4 @@
--- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.8.0
+-- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.9.0
 --
 -- 契约（引擎通用，零特例）：
 --   主题：仿 PCL 浅色——蓝顶栏 topbar #0A5FC4、内容区浅蓝灰对角渐变
@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.8.0" }
+  return { name = "PCL 浅色", version = "1.9.0" }
 end
 
 local C = {
@@ -67,6 +67,7 @@ local CONFIG = {
   pages = {
     home = "pageHome", download = "pageDownload", multi = "pageMulti",
     settings = "pageSettings", more = "pageMore", version_settings = "pageVersionSettings",
+    versionManager = "pageVersionManager", accountManager = "pageAccountManager",
   },
   tabs = TABS,
   home = {
@@ -114,6 +115,16 @@ local CONFIG = {
         { id = "moreFeedback",       icon = "sf:exclamationmark.bubble.fill", label = "问题反馈", right = "chevron", action = "open:more" },
         { id = "moreLogs",           icon = "sf:doc.text.fill",         label = "日志",       right = "chevron", action = "open:more" },
     } },
+  },
+  versionManager = {
+    title = "版本管理",
+    addAction = "open:download",
+    emptyText = "尚未安装任何游戏版本，可前往下载页获取。",
+  },
+  accountManager = {
+    title = "账号管理",
+    addAction = "open:settings",
+    emptyText = "暂无已登录账号，登录后即可联机同步。",
   },
 }
 
@@ -497,6 +508,83 @@ local function buildVersionSettingsPage()
     } }
 end
 
+-- ============ 版本管理二级页（列表 + 选中 + 返回可回首页）============
+local function buildVersionManagerPage()
+  local resp = launcher.service and launcher.service("version", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  local kids = {
+    -- 页眉：返回首页 + 标题
+    ui.row { id = "vmHeader", width = "94%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+      children = {
+        ui.button { id = "vmBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
+          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
+          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+        ui.text { text = CONFIG.versionManager.title, weight = 1,
+          style = { font = "3vh", weight = "bold", color = C.dark } },
+      } },
+  }
+  for i, v in ipairs(items) do
+    local sel = v.selected
+    kids[#kids + 1] = ui.row { id = "vm" .. i, height = "8vh", background = C.card, border = BORDER,
+      corner = "1.2vh", shadow = SHADOW, crossAlign = "center", spacing = "1.6vh", padding = "1.8vh",
+      action = "open:version_settings",
+      children = {
+        ui.image { icon = (v.type == "release" and "sf:checkmark.seal.fill" or "sf:cube.fill"),
+          size = "4.5vh", corner = "1vh", background = C.accent, style = { tint = C.white } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+          ui.text { id = "vm" .. i .. "Name", text = v.id or "", style = { font = "2.7vh", weight = "bold", color = C.dark } },
+          ui.text { text = (sel and "当前使用" or "本地版本"), style = { font = "2vh", color = C.mid } },
+        } },
+        chevron(),
+      } }
+  end
+  if #items == 0 then
+    kids[#kids + 1] = ui.text { text = CONFIG.versionManager.emptyText, width = "94%",
+      style = { font = "2.2vh", color = C.mid } }
+  end
+  kids[#kids + 1] = plainButton("vmAdd", "前往下载新版本", false)
+  return ui.column { id = "pageVersionManager", weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2.5vh", children = kids }
+end
+
+-- ============ 账号管理二级页（已登录账号列表 + 返回首页）============
+local function buildAccountManagerPage()
+  local resp = launcher.service and launcher.service("account", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  local kids = {
+    ui.row { id = "amHeader", width = "94%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+      children = {
+        ui.button { id = "amBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
+          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
+          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+        ui.text { text = CONFIG.accountManager.title, weight = 1,
+          style = { font = "3vh", weight = "bold", color = C.dark } },
+      } },
+  }
+  for i, a in ipairs(items) do
+    local sel = a.selected
+    kids[#kids + 1] = ui.row { id = "am" .. i, height = "8vh", background = C.card, border = BORDER,
+      corner = "1.2vh", shadow = SHADOW, crossAlign = "center", spacing = "1.6vh", padding = "1.8vh",
+      action = "open:settings",
+      children = {
+        ui.image { icon = "sf:person.crop.circle.fill", size = "4.5vh", corner = "1vh",
+          background = C.avatarBg, style = { tint = C.avatarLine } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+          ui.text { id = "am" .. i .. "Name", text = a.username or "", style = { font = "2.7vh", weight = "bold", color = C.dark } },
+          ui.text { text = (sel and "当前登录" or a.type or ""), style = { font = "2vh", color = C.mid } },
+        } },
+        chevron(),
+      } }
+  end
+  if #items == 0 then
+    kids[#kids + 1] = ui.text { text = CONFIG.accountManager.emptyText, width = "94%",
+      style = { font = "2.2vh", color = C.mid } }
+  end
+  kids[#kids + 1] = plainButton("amAdd", "登录 / 添加账号", true)
+  return ui.column { id = "pageAccountManager", weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2.5vh", children = kids }
+end
+
 -- ============ 根构建 ============
 function build(ui)
   local homeSidebar = buildHomeSidebar()
@@ -538,6 +626,8 @@ function build(ui)
               buildSettingsPage(),
               buildMorePage(),
               buildVersionSettingsPage(),
+              buildVersionManagerPage(),
+              buildAccountManagerPage(),
             },
           },
         } },
@@ -618,10 +708,11 @@ end
 
 function onPageChange(page)
   currentPage = page
-  local isSub = (page == "version_settings")
-  launcher.view("titlebar"):setVisible(not isSub)
-  launcher.view("left"):setVisible(page == "home" and not isSub)
-  if not isSub then
+  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理（顶栏仍显示，仅收左栏）
+  local isFull = (page == "version_settings") or (page == "versionManager") or (page == "accountManager")
+  launcher.view("titlebar"):setVisible(true)
+  launcher.view("left"):setVisible(page == "home" and not isFull)
+  if not isFull then
     local tabId = PAGE_TAB[page]
     if tabId then selectTab(tabId) end
   end
