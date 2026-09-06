@@ -68,6 +68,7 @@ local CONFIG = {
     home = "pageHome", download = "pageDownload", multi = "pageMulti",
     settings = "pageSettings", more = "pageMore", version_settings = "pageVersionSettings",
     versionManager = "pageVersionManager", accountManager = "pageAccountManager",
+    gameDirectory = "pageGameDirectory",
   },
   tabs = TABS,
   home = {
@@ -125,6 +126,11 @@ local CONFIG = {
     title = "账号管理",
     addAction = "open:settings",
     emptyText = "暂无已登录账号，登录后即可联机同步。",
+  },
+  gameDirectory = {
+    title = "游戏目录",
+    emptyText = "尚未创建其他游戏目录，可在下方输入目录名新建。",
+    addPlaceholder = "输入新目录名…",
   },
 }
 
@@ -585,6 +591,57 @@ local function buildAccountManagerPage()
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
+-- ============ 游戏目录二级页（默认 + instances 子目录列表，新建目录）============
+local function buildGameDirectoryPage()
+  local resp = launcher.service and launcher.service("gameDir", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  local kids = {
+    ui.row { id = "gdHeader", width = "94%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+      children = {
+        ui.button { id = "gdBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
+          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
+          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+        ui.text { text = CONFIG.gameDirectory.title, weight = 1,
+          style = { font = "3vh", weight = "bold", color = C.dark } },
+      } },
+  }
+  for i, d in ipairs(items) do
+    local sel = d.selected
+    kids[#kids + 1] = ui.row { id = "gd" .. i, height = "8vh", background = C.card, border = BORDER,
+      corner = "1.2vh", shadow = SHADOW, crossAlign = "center", spacing = "1.6vh", padding = "1.8vh",
+      hoverColor = C.hover,
+      children = {
+        ui.image { icon = "sf:folder.fill", size = "4.5vh", corner = "1vh",
+          background = (sel and C.accent or C.faintBlue), style = { tint = (sel and C.white or C.accent) } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+          ui.text { id = "gd" .. i .. "Name", text = d.name or "", style = { font = "2.7vh", weight = "bold", color = C.dark } },
+          ui.text { text = (sel and "当前使用" or "游戏目录"), style = { font = "2vh", color = C.mid } },
+        } },
+        ui.button { id = "gdPick" .. i, label = (sel and "使用中" or "使用"), width = "26%", height = "5vh",
+          action = "gdSelect:" .. (d.id or ""), corner = "pill",
+          background = (sel and C.accent or C.card), border = (sel and BORDER_A or BORDER),
+          style = { font = "2.3vh", tint = (sel and C.white or C.accent), weight = "bold" } },
+      } }
+  end
+  if #items <= 1 then
+    kids[#kids + 1] = ui.text { text = CONFIG.gameDirectory.emptyText, width = "94%",
+      style = { font = "2.2vh", color = C.mid } }
+  end
+  -- 新建目录输入行
+  kids[#kids + 1] = ui.row { width = "94%", height = "6vh", background = C.card, border = BORDER,
+    corner = "1.2vh", crossAlign = "center", padding = "1.2vh", spacing = "1.2vh",
+    children = {
+      ui.text { id = "gdNewName", text = CONFIG.gameDirectory.addPlaceholder, weight = 1,
+        style = { font = "2.3vh", color = C.mid } },
+      ui.button { id = "gdCreate", label = "新建", width = "26%", height = "5vh",
+        action = "gdCreate", corner = "pill", hoverColor = C.hover,
+        background = C.card, border = BORDER_A,
+        style = { font = "2.3vh", tint = C.accent, weight = "bold" } },
+    } }
+  return ui.column { id = "pageGameDirectory", weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2.5vh", children = kids }
+end
+
 -- ============ 根构建 ============
 function build(ui)
   local homeSidebar = buildHomeSidebar()
@@ -628,6 +685,7 @@ function build(ui)
               buildVersionSettingsPage(),
               buildVersionManagerPage(),
               buildAccountManagerPage(),
+              buildGameDirectoryPage(),
             },
           },
         } },
@@ -708,13 +766,26 @@ end
 
 function onPageChange(page)
   currentPage = page
-  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理（顶栏仍显示，仅收左栏）
-  local isFull = (page == "version_settings") or (page == "versionManager") or (page == "accountManager")
+  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录（顶栏仍显示，仅收左栏）
+  local isFull = (page == "version_settings") or (page == "versionManager")
+    or (page == "accountManager") or (page == "gameDirectory")
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(page == "home" and not isFull)
   if not isFull then
     local tabId = PAGE_TAB[page]
     if tabId then selectTab(tabId) end
+  end
+end
+
+local function refreshGameDirectory()
+  local resp = launcher.service and launcher.service("gameDir", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  for i, d in ipairs(items) do
+    local sel = d and d.selected
+    launcher.view("gd" .. i .. "Name"):setText((d and d.name) or "")
+    if launcher.view("gdPick" .. i) then
+      launcher.view("gdPick" .. i):setText(sel and "使用中" or "使用")
+    end
   end
 end
 
@@ -728,4 +799,19 @@ function onClick(id)
   if r then selectSegment("segR", tonumber(r), tonumber(i)) return end
   local m = id:match("^segM_(%d+)$")
   if m then selectSegment("segM", 3, tonumber(m)) return end
+  local gd = id:match("^gdSelect:(.+)$")
+  if gd then
+    launcher.service("gameDir", "set", { name = gd })
+    refreshGameDirectory()
+    return
+  end
+  if id == "gdCreate" then
+    local name = (launcher.view("gdNewName") and launcher.view("gdNewName"):getText()) or ""
+    name = tostring(name):gsub("^%s+", ""):gsub("%s+$", "")
+    if name ~= "" and name ~= CONFIG.gameDirectory.addPlaceholder then
+      launcher.service("gameDir", "new", { name = name })
+      refreshGameDirectory()
+    end
+    return
+  end
 end
