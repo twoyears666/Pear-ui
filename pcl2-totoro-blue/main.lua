@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.10.0" }
+  return { name = "PCL 浅色", version = "1.11.0" }
 end
 
 local C = {
@@ -70,7 +70,6 @@ local CONFIG = {
     versionManager = "pageVersionManager", accountManager = "pageAccountManager",
     gameDirectory = "pageGameDirectory",
   },
-  tabs = TABS,
   home = {
     secondaryLinks = { { label = "购买正版", action = "open:download" }, { label = "更换皮肤", action = "open:settings" } },
   },
@@ -132,7 +131,66 @@ local CONFIG = {
     emptyText = "尚未创建其他游戏目录，可在下方输入目录名新建。",
     addPlaceholder = "输入新目录名…",
   },
+  -- 设置子页：token → { 标题, 分组: 组名 + 白卡多行条目 }。点击设置条目经
+  -- open_subpage:token 进入；条目值用 "···" 占位结构（与版本信息一致，不写死内容）。
+  settingsSubpages = {
+    launcher_settings = { title = "启动器设置", groups = {
+      { name = "常规", rows = {
+        { label = "启动器主题",   value = "···" },
+        { label = "界面语言",     value = "···" },
+        { label = "检查更新",     value = "···" },
+      } },
+    } },
+    download_mirror = { title = "下载镜像策略", groups = {
+      { name = "镜像源", rows = {
+        { label = "下载源",      value = "···" },
+        { label = "自动检测延迟", value = "···" },
+      } },
+    } },
+    video_settings = { title = "视频设置", groups = {
+      { name = "渲染", rows = {
+        { label = "最大分辨率", value = "···" },
+        { label = "垂直同步",   value = "···" },
+        { label = "渲染占比",   value = "···" },
+      } },
+    } },
+    gl_renderer = { title = "MobileGlues 渲染器", groups = {
+      { name = "兼容层", rows = {
+        { label = "OpenGL 兼容层", value = "···" },
+        { label = "开启调试日志",  value = "···" },
+      } },
+    } },
+    control_keys = { title = "自定义控制键", groups = {
+      { name = "控制", rows = {
+        { label = "按键布局", value = "···" },
+        { label = "摇杆模式", value = "···" },
+      } },
+    } },
+    java_tuning = { title = "Java 调整", groups = {
+      { name = "内存与参数", rows = {
+        { label = "内存分配", value = "···" },
+        { label = "JVM 参数", value = "···" },
+      } },
+    } },
+    ui_theme = { title = "UI 设置", groups = {
+      { name = "外观", rows = {
+        { label = "界面缩放", value = "···" },
+        { label = "主题材质包", value = "···" },
+      } },
+    } },
+    ai_assistant = { title = "AI 助手", groups = {
+      { name = "助手", rows = {
+        { label = "服务商", value = "···" },
+        { label = "对话模型", value = "···" },
+      } },
+    } },
+  },
 }
+
+-- 设置子页注册：token → 内容区 Lua 页子树 id（引擎经 open_subpage:token 切页）。
+for _subKey in pairs(CONFIG.settingsSubpages) do
+  CONFIG.pages[_subKey] = "sub_" .. _subKey
+end
 
 -- ===== 通用构件 =====
 local function pushAll(dst, src) for _, v in ipairs(src) do dst[#dst + 1] = v end end
@@ -553,6 +611,41 @@ local function buildVersionManagerPage()
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
+-- ============ 通用设置子页（token → 标题 + 分组白卡；返回设置）============
+local function buildSettingsSubpage(token, spec)
+  local kids = {
+    ui.row { id = "sub" .. token .. "Header", width = "94%", height = "6vh",
+      crossAlign = "center", spacing = "1.5vh",
+      children = {
+        ui.button { id = "sub" .. token .. "Back", label = "‹ 返回", action = "open:settings",
+          width = "22%", height = "5vh", background = C.card, border = BORDER, corner = "0.8vh",
+          hoverColor = C.hover, style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+        ui.text { text = spec.title or "", weight = 1,
+          style = { font = "3vh", weight = "bold", color = C.dark } },
+      } },
+  }
+  for gi, g in ipairs(spec.groups or {}) do
+    local rows = {}
+    for ri, r in ipairs(g.rows or {}) do
+      rows[#rows + 1] = ui.row { id = "sub" .. token .. "r" .. gi .. "_" .. ri, height = "6.5vh",
+        crossAlign = "center", padding = "1.8vh", spacing = "1.6vh", hoverColor = C.hover,
+        children = {
+          ui.text { text = r.label or "", weight = 1, style = { font = "2.6vh", color = C.dark } },
+          ui.text { text = r.value or "", style = { font = "2.4vh", color = C.accent } },
+          chevron(),
+        } }
+    end
+    kids[#kids + 1] = ui.column { width = "94%", spacing = "1vh", crossAlign = "stretch",
+      children = {
+        ui.text { text = g.name or "", width = "100%", style = { font = "2.1vh", color = C.mid } },
+        ui.column { background = C.card, border = BORDER, corner = "1.2vh", shadow = SHADOW,
+          padding = "1vh", spacing = "0.5vh", children = rows },
+      } }
+  end
+  return ui.column { id = "sub_" .. token, weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2.5vh", children = kids }
+end
+
 -- ============ 账号管理二级页（已登录账号列表 + 返回首页）============
 local function buildAccountManagerPage()
   local resp = launcher.service and launcher.service("account", "list", {}) or nil
@@ -646,6 +739,21 @@ end
 function build(ui)
   local homeSidebar = buildHomeSidebar()
   local pageHome = buildHomePage()
+  -- 内容区页子树：显式页 + 全部设置子页（数据驱动，引擎仅按 CONFIG.pages 切页）
+  local contentChildren = {
+    pageHome,
+    buildDownloadPage(),
+    buildMultiPage(),
+    buildSettingsPage(),
+    buildMorePage(),
+    buildVersionSettingsPage(),
+    buildVersionManagerPage(),
+    buildAccountManagerPage(),
+    buildGameDirectoryPage(),
+  }
+  for _tok, _spec in pairs(CONFIG.settingsSubpages) do
+    contentChildren[#contentChildren + 1] = buildSettingsSubpage(_tok, _spec)
+  end
 
   return ui.column {
     id = "shell", crossAlign = "stretch", spacing = 0,
@@ -676,17 +784,7 @@ function build(ui)
             id = "content", weight = 1, initialPage = "home",
             background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
             pages = CONFIG.pages,
-            children = {
-              pageHome,
-              buildDownloadPage(),
-              buildMultiPage(),
-              buildSettingsPage(),
-              buildMorePage(),
-              buildVersionSettingsPage(),
-              buildVersionManagerPage(),
-              buildAccountManagerPage(),
-              buildGameDirectoryPage(),
-            },
+            children = contentChildren,
           },
         } },
     },
@@ -766,12 +864,15 @@ end
 
 function onPageChange(page)
   currentPage = page
-  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录（顶栏仍显示，仅收左栏）
+  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
   local isFull = (page == "version_settings") or (page == "versionManager")
     or (page == "accountManager") or (page == "gameDirectory")
+    or (CONFIG.settingsSubpages[page] ~= nil)
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(page == "home" and not isFull)
-  if not isFull then
+  if isFull and CONFIG.settingsSubpages[page] then
+    selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
+  elseif not isFull then
     local tabId = PAGE_TAB[page]
     if tabId then selectTab(tabId) end
   end
