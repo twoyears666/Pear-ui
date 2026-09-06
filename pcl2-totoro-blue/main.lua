@@ -365,7 +365,7 @@ local function buildDownloadPage()
     children = {
       ui.row { id = "dlSeg1", width = "94%", spacing = "1vh", children = seg1 },
       ui.row { id = "dlSeg2", width = "94%", spacing = "1vh", children = seg2 },
-      unpack(items),
+      table.unpack(items),
     },
   }
 end
@@ -402,7 +402,7 @@ local function buildMultiPage()
           ui.text { text = "输入对方分享的房间连接码即可加入", style = { font = "2.4vh", color = C.mid } },
         },
       },
-      unpack(rooms),
+      table.unpack(rooms),
     },
   }
   -- 创建房间：白底表单卡 + 底部实心蓝主按钮
@@ -964,6 +964,15 @@ local function selectedSubNavId()
   return selectedSubNav or SUB_NAV[1].id
 end
 
+local function selectSubNav(id)
+  selectedSubNav = id
+  for _, n in ipairs(SUB_NAV) do
+    local sel = (n.id == id)
+    launcher.view(n.id .. "Bar"):setVisible(sel)
+    launcher.view(n.id .. "Label"):setStyle(sel and { tint = C.accent } or { tint = C.mid })
+  end
+end
+
 function onPageChange(page)
   local isSub = (page == "version_settings")
   -- 二级页隐藏主顶栏（自带返回蓝栏）；其余页恢复主顶栏
@@ -976,15 +985,6 @@ function onPageChange(page)
   end
   -- 仅启动页显示白左栏；其余页左栏坍缩、内容整幅铺开
   launcher.view("left"):setVisible(page == "home")
-end
-
-function selectSubNav(id)
-  selectedSubNav = id
-  for _, n in ipairs(SUB_NAV) do
-    local sel = (n.id == id)
-    launcher.view(n.id .. "Bar"):setVisible(sel)
-    launcher.view(n.id .. "Label"):setStyle(sel and { tint = C.accent } or { tint = C.mid })
-  end
 end
 
 -- 首个布局完成后被引擎调用：游标等依赖真实 frame 的定位此时才有坐标可读。
