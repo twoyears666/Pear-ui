@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.0" }
+  return { name = "PCL 浅色", version = "1.12.0" }
 end
 
 local C = {
@@ -68,7 +68,7 @@ local CONFIG = {
     home = "pageHome", download = "pageDownload", multi = "pageMulti",
     settings = "pageSettings", more = "pageMore", version_settings = "pageVersionSettings",
     versionManager = "pageVersionManager", accountManager = "pageAccountManager",
-    gameDirectory = "pageGameDirectory",
+    gameDirectory = "pageGameDirectory", mods = "pageMods",
   },
   home = {
     secondaryLinks = { { label = "购买正版", action = "open:download" }, { label = "更换皮肤", action = "open:settings" } },
@@ -130,6 +130,12 @@ local CONFIG = {
     title = "游戏目录",
     emptyText = "尚未创建其他游戏目录，可在下方输入目录名新建。",
     addPlaceholder = "输入新目录名…",
+  },
+  mods = {
+    title = "资源中心",
+    emptyText = "当前版本暂无 Mod，点击右上角刷新。",
+    maxRows = 16, -- 预渲染行槽位上限（动态内容，结构仅描述槽位数）
+    refresh = "刷新",
   },
   -- 设置子页：token → { 标题, 分组: 组名 + 白卡多行条目 }。点击设置条目经
   -- open_subpage:token 进入；条目值用 "···" 占位结构（与版本信息一致，不写死内容）。
@@ -646,6 +652,79 @@ local function buildSettingsSubpage(token, spec)
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
+-- ============ 资源中心（Mods）：预渲染槽位 + onModsUpdated 用 setter 增量更新 ============
+local function buildModsPage()
+  local kids = {
+    ui.row { id = "modHeader", width = "94%", height = "6vh", crossAlign = "center",
+      spacing = "1.5vh",
+      children = {
+        ui.button { id = "modBack", label = "‹ 返回", action = "open:home", width = "22%",
+          height = "5vh", background = C.card, border = BORDER, corner = "0.8vh",
+          hoverColor = C.hover, style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+        ui.text { id = "modTitle", text = CONFIG.mods.title or "资源中心", weight = 1,
+          style = { font = "3vh", weight = "bold", color = C.dark } },
+        ui.button { id = "modRefresh", label = CONFIG.mods.refresh or "刷新", width = "22%",
+          height = "5vh", action = "modsRefresh", background = C.card, border = BORDER_A,
+          corner = "pill", hoverColor = C.hover,
+          style = { font = "2.3vh", weight = "bold", tint = C.accent } },
+      } },
+    ui.text { id = "modConfig", text = "游戏版本 · 运行配置", width = "94%",
+      style = { font = "2.1vh", color = C.mid } },
+  }
+  -- 预渲染槽位（上限 CONFIG.mods.maxRows），默认隐藏；onModsUpdated 后由 refreshMods 逐个填。
+  local slots = {}
+  for i = 1, CONFIG.mods.maxRows do
+    slots[#slots + 1] = ui.row { id = "modRow_" .. i, height = "7vh", crossAlign = "center",
+      padding = "1.6vh", spacing = "1.4vh", visible = false,
+      children = {
+        ui.image { icon = "sf:puzzlepiece.fill", size = "4.2vh", corner = "0.9vh",
+          background = C.faintBlue, style = { tint = C.accent } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh",
+          children = {
+            ui.text { id = "modRow_" .. i .. "_Name", text = "", weight = 1,
+              style = { font = "2.6vh", weight = "bold", color = C.dark } },
+            ui.text { id = "modRow_" .. i .. "_Meta", text = "", weight = 1,
+              style = { font = "2vh", color = C.mid } },
+          } },
+        ui.button { id = "modRow_" .. i .. "_Toggle", label = "启用", width = "24%", height = "5vh",
+          action = "modsToggle:" .. i, corner = "pill", background = C.card, border = BORDER_A,
+          style = { font = "2.2vh", tint = C.accent, weight = "bold" } },
+        ui.button { id = "modRow_" .. i .. "_Del", label = "删除", width = "22%", height = "5vh",
+          action = "modsDelete:" .. i, corner = "pill", background = C.card, border = BORDER,
+          hoverColor = C.hover, style = { font = "2.2vh", tint = C.danger } },
+      } }
+  end
+  kids[3] = ui.column { id = "modListWrap", width = "94%", background = C.card, border = BORDER,
+    corner = "1.2vh", shadow = SHADOW, padding = "1vh", spacing = "0.5vh", crossAlign = "stretch",
+    children = slots }
+  kids[#kids + 1] = ui.text { id = "modEmpty", text = CONFIG.mods.emptyText, width = "94%",
+    visible = true, style = { font = "2.2vh", color = C.mid } }
+  return ui.column { id = "pageMods", weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2vh", children = kids }
+end
+
+local function refreshMods()
+  local resp = launcher.service and launcher.service("mods", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  local count = #items
+  for i = 1, CONFIG.mods.maxRows do
+    local m = items[i]
+    if not m then
+      launcher.view("modRow_" .. i):setVisible(false)
+      goto continue
+    end
+    launcher.view("modRow_" .. i):setVisible(true)
+    launcher.view("modRow_" .. i .. "_Name"):setText(m.name or "")
+    launcher.view("modRow_" .. i .. "_Meta"):setText((m.gameVersion or "") .. " · " .. (m.author or ""))
+    local en = m.enabled
+    launcher.view("modRow_" .. i .. "_Toggle"):setText(en and "禁用" or "启用")
+    ::continue::
+  end
+  launcher.view("modEmpty"):setVisible(count == 0)
+  local profile = resp.profile or ""
+  launcher.view("modConfig"):setText((profile ~= "" and profile or "默认") .. " · 运行配置")
+end
+
 -- ============ 账号管理二级页（已登录账号列表 + 返回首页）============
 local function buildAccountManagerPage()
   local resp = launcher.service and launcher.service("account", "list", {}) or nil
@@ -750,6 +829,7 @@ function build(ui)
     buildVersionManagerPage(),
     buildAccountManagerPage(),
     buildGameDirectoryPage(),
+    buildModsPage(),
   }
   for _tok, _spec in pairs(CONFIG.settingsSubpages) do
     contentChildren[#contentChildren + 1] = buildSettingsSubpage(_tok, _spec)
@@ -862,14 +942,23 @@ function onAccountChange(account)
   launcher.view("accountPickerLabel"):setText(account.name or "未登录")
 end
 
+-- 引擎异步扫描 Mods 完成后推流：用 setter 增量刷新资源中心槽位（无整树重建）。
+function onModsUpdated(payload)
+  refreshMods()
+end
+
 function onPageChange(page)
   currentPage = page
   -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
   local isFull = (page == "version_settings") or (page == "versionManager")
-    or (page == "accountManager") or (page == "gameDirectory")
+    or (page == "accountManager") or (page == "gameDirectory") or (page == "mods")
     or (CONFIG.settingsSubpages[page] ~= nil)
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(page == "home" and not isFull)
+  if page == "mods" then
+    launcher.service("mods", "refresh", {})
+    refreshMods()
+  end
   if isFull and CONFIG.settingsSubpages[page] then
     selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
   elseif not isFull then
@@ -900,6 +989,23 @@ function onClick(id)
   if r then selectSegment("segR", tonumber(r), tonumber(i)) return end
   local m = id:match("^segM_(%d+)$")
   if m then selectSegment("segM", 3, tonumber(m)) return end
+  if id == "modsRefresh" then
+    launcher.service("mods", "refresh", {})
+    refreshMods()
+    return
+  end
+  local md = id:match("^modsToggle:(%d+)$")
+  if md then
+    launcher.service("mods", "toggle", { index = tonumber(md) })
+    refreshMods()
+    return
+  end
+  local mdel = id:match("^modsDelete:(%d+)$")
+  if mdel then
+    launcher.service("mods", "delete", { index = tonumber(mdel) })
+    refreshMods()
+    return
+  end
   local gd = id:match("^gdSelect:(.+)$")
   if gd then
     launcher.service("gameDir", "set", { name = gd })
