@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.3" }
+  return { name = "PCL 浅色", version = "1.11.4" }
 end
 
 local C = {
@@ -106,6 +106,7 @@ local CONFIG = {
     searchLabels = { "搜索源", "搜索对象", "搜索关键词" },
     vanillaTypes = { "最新版本", "正式版", "快照" },
     installHint = "安装后请留意版本与 Mod 兼容性；Fabric/Forge 需安装对应加载器。",
+    defaultVersion = "1.20.1", -- 下载页「开始下载」默认安装的版本 id（可改；接版本清单后可动态选）
   },
   online = {
     branch = { "局域网", "在线" },
@@ -410,7 +411,19 @@ local function buildDownloadPage()
         ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2.1vh", color = C.dark } },
       } }
     k[#k + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
-      children = { plainButton("dlInstall", "开始下载 / 安装", true) } }
+      children = { ui.button { id = "dlInstall", label = "开始下载 / 安装", weight = 1, height = "5.5vh",
+        background = C.card, border = BORDER_A, corner = "0.7vh", action = "dlStart",
+        style = { font = "2.4vh", weight = "bold", tint = C.accent } } } }
+    -- 下载进度区（下载中显示）
+    k[#k + 1] = ui.column { id = "dlProgress", width = "100%", visible = false, spacing = "1vh",
+      crossAlign = "stretch",
+      children = {
+        ui.row { height = "1.6vh", background = C.faintBlue, corner = "pill", overflow = "hidden",
+          children = { ui.column { id = "dlBarFill", width = "0%", height = "100%",
+            background = { from = C.accent, to = C.cyan, angle = 0 } } } },
+        ui.text { id = "dlProgressLabel", text = "准备中…", width = "100%",
+          style = { font = "2.2vh", color = C.dark } },
+      } }
     return k
   end)())
   local dlSearch = {}
@@ -1002,6 +1015,16 @@ function onAccountChange(account)
   launcher.view("accountPickerLabel"):setText(account.name or "未登录")
 end
 
+-- 真下载进度推流（download.start 后由引擎每 0.3s 上报）：更新进度条与文本。
+function onDownloadUpdate(payload)
+  local p = payload or {}
+  local done = p.downloaded or 0
+  local total = p.total or 100
+  local pct = (total > 0) and math.floor(done / total * 100) or 0
+  launcher.view("dlBarFill"):setStyle({ width = pct .. "%" })
+  launcher.view("dlProgressLabel"):setText(p.finished and ("安装完成（" .. pct .. "%）") or ("下载中 " .. pct .. "%…"))
+end
+
 function onPageChange(page)
   currentPage = page
   -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
@@ -1045,6 +1068,13 @@ function onClick(id)
   end
   if id == "cap.offline" then selectCap(1) return end
   if id == "cap.genuine" then selectCap(2) return end
+  if id == "dlStart" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("准备中…")
+    launcher.view("dlBarFill"):setStyle({ width = "0%" })
+    launcher.service("download", "start", { versionId = CONFIG.download.defaultVersion })
+    return
+  end
   local dlc = id:match("^dlCat:(%d+)$")
   if dlc then
     dlSelCat = tonumber(dlc) or 1
