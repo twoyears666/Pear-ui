@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.12.0" }
+  return { name = "PCL 浅色", version = "1.13.0" }
 end
 
 local C = {
@@ -136,6 +136,20 @@ local CONFIG = {
     emptyText = "当前版本暂无 Mod，点击右上角刷新。",
     maxRows = 16, -- 预渲染行槽位上限（动态内容，结构仅描述槽位数）
     refresh = "刷新",
+  },
+  -- 目录侧栏（仿 PCL：除启动页外常驻左侧的游戏目录列表 + 添加/导入入口）。
+  -- 数据来自引擎 gameDir.list（默认 + instances 子目录），点击行选中（gameDir.set）。
+  -- 结构仅描述：文件夹槽位上限 + 「添加或导入」入口行；槽位内容由 refreshDirectorySidebar 增量填充。
+  directorySidebar = {
+    foldersHeader  = "文件夹列表",
+    maxFolderSlots = 8,    -- 预渲染目录行槽位上限（动态内容，结构不写死目录）
+    emptyText      = "暂无游戏目录",
+    addHeader      = "添加或导入",
+    rows = {
+      { id = "dirAdd",    icon = "sf:plus.circle.fill",       label = "添加已有文件夹", action = "open:gameDirectory" },
+      { id = "dirNew",    icon = "sf:folder.badge.plus.fill", label = "新建文件夹",     action = "open:gameDirectory" },
+      { id = "dirManage", icon = "sf:gearshape.fill",          label = "游戏目录设置",   action = "open:gameDirectory" },
+    },
   },
   -- 设置子页：token → { 标题, 分组: 组名 + 白卡多行条目 }。点击设置条目经
   -- open_subpage:token 进入；条目值用 "···" 占位结构（与版本信息一致，不写死内容）。
@@ -814,6 +828,74 @@ local function buildGameDirectoryPage()
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
+-- ============ 目录侧栏（仿 PCL：左侧常驻游戏目录列表 + 添加/导入）============
+local dirItems = {}  -- 当前游戏目录列表（refreshDirectorySidebar 填充
+local function buildDirectorySidebar()
+  local kids = {
+    ui.text { text = CONFIG.directorySidebar.foldersHeader, width = "100%",
+      style = { font = "2.1vh", color = C.mid } },
+  }
+  -- 目录行（RadioBox 语义：选中高亮；结构仅槽位，内容由 refresh 增量填充）
+  for i = 1, CONFIG.directorySidebar.maxFolderSlots do
+    kids[#kids + 1] = ui.row { id = "dirSlot_" .. i, height = "6.5vh", width = "100%",
+      background = C.card, corner = "0.9vh", hoverColor = C.hover, visible = false,
+      crossAlign = "center", spacing = "1.2vh", padding = { left = "1.4vh", right = "1.4vh" },
+      action = "dirSel:" .. i,
+      children = {
+        ui.image { icon = "sf:folder.fill", size = "4vh", corner = "0.7vh",
+          background = C.faintBlue, style = { tint = C.accent } },
+        ui.column { weight = 1, justify = "center", spacing = "0.2vh", children = {
+          ui.text { id = "dirSlot_" .. i .. "_Name", text = "", weight = 1,
+            style = { font = "2.4vh", weight = "bold", color = C.dark } },
+          ui.text { id = "dirSlot_" .. i .. "_Info", text = "", weight = 1,
+            style = { font = "1.9vh", color = C.mid } },
+        } },
+        ui.text { id = "dirSlot_" .. i .. "_Sel", text = "",
+          style = { font = "2vh", color = C.accent } },
+      } }
+  end
+  kids[#kids + 1] = ui.text { id = "dirEmpty", text = CONFIG.directorySidebar.emptyText,
+    width = "100%", visible = true, style = { font = "2vh", color = C.mid } }
+  kids[#kids + 1] = ui.text { text = CONFIG.directorySidebar.addHeader, width = "100%",
+    style = { font = "2.1vh", color = C.mid } }
+  for _, r in ipairs(CONFIG.directorySidebar.rows) do
+    kids[#kids + 1] = ui.row { id = r.id, height = "6vh", width = "100%",
+      background = C.card, border = BORDER, corner = "0.9vh", action = r.action,
+      hoverColor = C.hover, crossAlign = "center", spacing = "1.2vh",
+      padding = { left = "1.4vh", right = "1.4vh" },
+      children = {
+        ui.image { icon = r.icon, size = "3.8vh", corner = "0.7vh",
+          background = C.faintBlue, style = { tint = C.accent } },
+        ui.text { text = r.label, weight = 1, style = { font = "2.3vh", color = C.dark } },
+      } }
+  end
+  return kids
+end
+
+-- 引擎异步返回目录后增量填充左侧目录列表（无整树重建）
+local function refreshDirectorySidebar()
+  local resp = launcher.service and launcher.service("gameDir", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  dirItems = items
+  local count = #items
+  for i = 1, CONFIG.directorySidebar.maxFolderSlots do
+    local m = items[i]
+    if not m then
+      launcher.view("dirSlot_" .. i):setVisible(false)
+      goto continue
+    end
+    launcher.view("dirSlot_" .. i):setVisible(true)
+    launcher.view("dirSlot_" .. i .. "_Name"):setText(m.name or "")
+    launcher.view("dirSlot_" .. i .. "_Info"):setText("游戏目录")
+    launcher.view("dirSlot_" .. i .. "_Sel"):setText(m.selected and "使用" or "")
+    launcher.view("dirSlot_" .. i):setStyle(m.selected
+      and { background = C.hover, borderColor = C.accent, borderWidth = 1.5 }
+      or  { background = C.card, borderColor = C.cardBorder, borderWidth = 1 })
+    ::continue::
+  end
+  launcher.view("dirEmpty"):setVisible(count == 0)
+end
+
 -- ============ 根构建 ============
 function build(ui)
   local homeSidebar = buildHomeSidebar()
@@ -859,7 +941,13 @@ function build(ui)
         children = {
           ui.column { id = "left", width = "32%", background = C.card, crossAlign = "center",
             spacing = "0.4vh", padding = { left = "2vh", right = "2vh", top = "1vh", bottom = "1vh" },
-            children = homeSidebar },
+            children = {
+              -- 启动页左栏（胶囊/头像/启动按钮）；其他页切换到 leftDir 目录侧栏
+              ui.column { id = "leftHome", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", children = homeSidebar },
+              ui.column { id = "leftDir", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildDirectorySidebar() },
+            } },
           ui.content {
             id = "content", weight = 1, initialPage = "home",
             background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
@@ -930,6 +1018,7 @@ function onReady()
   selectCap(selectedCap)
   for r = 1, 2 do selectSegment("segR", r, segSel[r] or 1) end
   selectSegment("segM", 3, segSel[3] or 1)
+  refreshDirectorySidebar() -- 预填目录侧栏数据（启动页也可取回，切页时再刷新）
   onPageChange(currentPage)
 end
 
@@ -949,12 +1038,18 @@ end
 
 function onPageChange(page)
   currentPage = page
-  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
+  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 资源中心 / 任意设置子页（顶栏仍显示，仅收左栏）
   local isFull = (page == "version_settings") or (page == "versionManager")
     or (page == "accountManager") or (page == "gameDirectory") or (page == "mods")
     or (CONFIG.settingsSubpages[page] ~= nil)
   launcher.view("titlebar"):setVisible(true)
-  launcher.view("left"):setVisible(page == "home" and not isFull)
+  launcher.view("left"):setVisible(not isFull)
+  -- 左栏双态：启动页 = leftHome（胶囊/头像/启动按钮）；其余页 = leftDir（仿 PCL 目录侧栏）
+  launcher.view("leftHome"):setVisible(page == "home")
+  launcher.view("leftDir"):setVisible(page ~= "home" and not isFull)
+  if page ~= "home" and not isFull then
+    refreshDirectorySidebar()
+  end
   if page == "mods" then
     launcher.service("mods", "refresh", {})
     refreshMods()
@@ -1010,6 +1105,15 @@ function onClick(id)
   if gd then
     launcher.service("gameDir", "set", { name = gd })
     refreshGameDirectory()
+    return
+  end
+  local di = id:match("^dirSel:(%d+)$")
+  if di then
+    local m = dirItems and dirItems[tonumber(di)]
+    if m and type(m.name) == "string" and m.name ~= "" then
+      launcher.service("gameDir", "set", { name = m.name })
+    end
+    refreshDirectorySidebar()
     return
   end
   if id == "gdCreate" then
