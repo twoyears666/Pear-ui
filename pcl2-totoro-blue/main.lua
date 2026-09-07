@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.0" }
+  return { name = "PCL 浅色", version = "1.11.1" }
 end
 
 local C = {
@@ -215,14 +215,14 @@ local function card(id, children)
     corner = "1.2vh", shadow = SHADOW, padding = "2vh", spacing = "1vh", children = children }
 end
 
--- 整行条目卡（row_item）：左图标 + 中列(标题/副题) + 右文本；整行可点、hover 浅蓝
-local function listEntry(id, icon, tint, title, sub, rightText)
+-- 整行条目卡（row_item）：左图标 + 中列(标题/副题) + 右文本；整行可点、hover 浅蓝，图标圆角
+local function listEntry(id, icon, tint, title, sub, rightText, action)
   return ui.row {
     id = id, height = "8vh", background = C.card, corner = "1.2vh",
     border = BORDER, shadow = SHADOW, hoverColor = C.hover, crossAlign = "center",
-    padding = { left = "2vh", right = "2vh" }, spacing = "1.6vh",
+    padding = { left = "2vh", right = "2vh" }, spacing = "1.6vh", action = action,
     children = {
-      ui.image { icon = icon, size = "5vh", corner = "0.8vh",
+      ui.image { icon = icon, size = "5vh", corner = "pill",
         background = { from = C.accent, to = tint, angle = 30 }, style = { tint = C.white } },
       ui.column { weight = 1, justify = "center", spacing = "0.4vh", children = {
         ui.text { id = id .. "Title", text = title, style = { font = "2.8vh", weight = "bold", color = C.dark } },
@@ -239,7 +239,7 @@ local function bigItem(id, icon, tint, title, meta, rightText)
     border = BORDER, shadow = SHADOW, hoverColor = C.hover, crossAlign = "center",
     padding = { left = "2vh", right = "2vh" }, spacing = "1.8vh",
     children = {
-      ui.image { icon = icon, size = "10vh", corner = "0.8vh",
+      ui.image { icon = icon, size = "10vh", corner = "pill",
         background = { from = tint, to = C.accent, angle = 30 }, style = { tint = C.white } },
       ui.column { weight = 1, justify = "center", spacing = "0.5vh", children = {
         ui.text { text = title, style = { font = "2.5vh", weight = "bold", color = C.dark } },
@@ -365,13 +365,13 @@ local function buildHomePage()
       }),
       card("homeQuick", {
         ui.text { text = "快速开始", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-        listEntry("homeQ1", "sf:cube.fill", C.green, "选择版本", "尚未选择游戏版本", "›"),
-        listEntry("homeQ2", "sf:person.3.fill", C.orange, "登录账号", "未登录", "›"),
+        listEntry("homeQ1", "sf:cube.fill", C.green, "选择版本", "尚未选择游戏版本", "›", "open:versionManager"),
+        listEntry("homeQ2", "sf:person.3.fill", C.orange, "登录账号", "未登录", "›", "open:accountManager"),
       }),
       card("homeNews", {
         ui.text { text = "近期动态", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-        listEntry("homeN1", "sf:newspaper.fill", C.cyan, "启动器更新日志", "查看最近更改与已知问题", "›"),
-        listEntry("homeN2", "sf:cloud.fill", C.purple, "版本镜像与资源", "下载源与资源中心入口", "›"),
+        listEntry("homeN1", "sf:newspaper.fill", C.cyan, "启动器更新日志", "查看最近更改与已知问题", "›", "open:more"),
+        listEntry("homeN2", "sf:cloud.fill", C.purple, "版本镜像与资源", "下载源与资源中心入口", "›", "open:download"),
       }),
     } }
 end
@@ -736,6 +736,61 @@ local function buildGameDirectoryPage()
 end
 
 -- ============ 根构建 ============
+-- 非首页目录侧栏：游戏目录(instances) 文件夹列表 + 添加/导入（数据驱动，克隆 gameDir 服务）
+local function buildDirectorySidebar()
+  local kids = {
+    ui.text { text = "文件夹列表", width = "100%", style = { font = "2.1vh", color = C.mid } },
+  }
+  for i = 1, 5 do
+    kids[#kids + 1] = ui.row { id = "dirSlot_" .. i, height = "6vh", width = "100%",
+      background = C.card, corner = "0.9vh", hoverColor = C.hover, visible = false,
+      crossAlign = "center", spacing = "1vh", padding = { left = "1.4vh", right = "1.4vh" },
+      action = "dirSel:" .. i,
+      children = {
+        ui.image { icon = "sf:folder.fill", size = "3.6vh", corner = "pill",
+          background = C.faintBlue, style = { tint = C.accent } },
+        ui.column { weight = 1, justify = "center", spacing = "0.2vh",
+          children = {
+            ui.text { id = "dirSlot_" .. i .. "_Name", text = "", style = { font = "2.3vh", weight = "bold", color = C.dark } },
+            ui.text { id = "dirSlot_" .. i .. "_Meta", text = "", style = { font = "1.8vh", color = C.mid } },
+          } },
+      } }
+  end
+  kids[#kids + 1] = ui.text { id = "dirEmpty", text = "暂无游戏目录", width = "100%", visible = true,
+    style = { font = "2vh", color = C.mid } }
+  kids[#kids + 1] = ui.text { text = "添加或导入", width = "100%", style = { font = "2.1vh", color = C.mid } }
+  for _, r in ipairs({ { id = "dirAdd", icon = "sf:plus.circle.fill", label = "添加已有文件夹" },
+                       { id = "dirNew", icon = "sf:folder.badge.plus.fill", label = "新建文件夹" } }) do
+    kids[#kids + 1] = ui.row { id = r.id, width = "100%", height = "5.5vh", action = "open:gameDirectory",
+      background = C.card, border = BORDER, corner = "0.9vh", hoverColor = C.hover,
+      crossAlign = "center", spacing = "1vh", padding = { left = "1.2vh", right = "1.2vh" },
+      children = {
+        ui.image { icon = r.icon, size = "3.2vh", corner = "pill", background = C.faintBlue,
+          style = { tint = C.accent } },
+        ui.text { text = r.label, weight = 1, style = { font = "2.2vh", color = C.dark } },
+      } }
+  end
+  return kids
+end
+
+local function refreshDirectorySidebar()
+  local resp = launcher.service and launcher.service("gameDir", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  local count = #items
+  for i = 1, 5 do
+    local m = items[i]
+    if not m then
+      launcher.view("dirSlot_" .. i):setVisible(false)
+      goto continue
+    end
+    launcher.view("dirSlot_" .. i):setVisible(true)
+    launcher.view("dirSlot_" .. i .. "_Name"):setText(m.name or "")
+    launcher.view("dirSlot_" .. i .. "_Meta"):setText(m.selected and "当前使用" or "游戏目录")
+    ::continue::
+  end
+  launcher.view("dirEmpty"):setVisible(count == 0)
+end
+
 function build(ui)
   local homeSidebar = buildHomeSidebar()
   local pageHome = buildHomePage()
@@ -779,7 +834,13 @@ function build(ui)
         children = {
           ui.column { id = "left", width = "32%", background = C.card, crossAlign = "center",
             spacing = "0.4vh", padding = { left = "2vh", right = "2vh", top = "1vh", bottom = "1vh" },
-            children = homeSidebar },
+            children = {
+              -- 启动页左栏；其他页切到 leftDir 目录侧栏
+              ui.column { id = "leftHome", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", children = homeSidebar },
+              ui.column { id = "leftDir", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildDirectorySidebar() },
+            } },
           ui.content {
             id = "content", weight = 1, initialPage = "home",
             background = { from = C.pageFrom, to = C.pageTo, angle = 45 },
@@ -869,7 +930,10 @@ function onPageChange(page)
     or (page == "accountManager") or (page == "gameDirectory")
     or (CONFIG.settingsSubpages[page] ~= nil)
   launcher.view("titlebar"):setVisible(true)
-  launcher.view("left"):setVisible(page == "home" and not isFull)
+  launcher.view("left"):setVisible(not isFull)
+  launcher.view("leftHome"):setVisible(page == "home")
+  launcher.view("leftDir"):setVisible(page ~= "home" and not isFull)
+  if page ~= "home" and not isFull then refreshDirectorySidebar() end
   if isFull and CONFIG.settingsSubpages[page] then
     selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
   elseif not isFull then
@@ -904,6 +968,17 @@ function onClick(id)
   if gd then
     launcher.service("gameDir", "set", { name = gd })
     refreshGameDirectory()
+    return
+  end
+  local ds = id:match("^dirSel:(%d+)$")
+  if ds then
+    local r = launcher.service and launcher.service("gameDir", "list", {}) or nil
+    local its = (type(r) == "table" and r.ok and type(r.items) == "table") and r.items or {}
+    local m = its[tonumber(ds)]
+    if m and type(m.name) == "string" and m.name ~= "" then
+      launcher.service("gameDir", "set", { name = m.name })
+    end
+    refreshDirectorySidebar()
     return
   end
   if id == "gdCreate" then
