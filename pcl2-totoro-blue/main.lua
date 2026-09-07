@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.1" }
+  return { name = "PCL 浅色", version = "1.11.2" }
 end
 
 local C = {
@@ -78,6 +78,20 @@ local CONFIG = {
       { "最新版本", "正式版", "快照" },
       { "Mods", "光影", "整合包" },
     },
+    -- 下载页左侧分类目录（仿 PCL PageDownloadLeft）
+    sidebarGroups = {
+      { name = "原版游戏", items = {
+        { id = "dlCat_1", label = "原版游戏" },
+      } },
+      { name = "社区资源", items = {
+        { id = "dlCat_2", label = "Mod" },
+        { id = "dlCat_3", label = "整合包" },
+        { id = "dlCat_4", label = "数据包" },
+        { id = "dlCat_5", label = "资源包" },
+        { id = "dlCat_6", label = "光影包" },
+      } },
+    },
+    titleByCat = { "原版游戏", "Mod", "整合包", "数据包", "资源包", "光影包" },
     latest = {
       { icon = "sf:cube.fill",          tint = C.green,  title = "最新 Java 版本", sub = "正式版 · 稳定 · 更新于 ···" },
       { icon = "sf:shippingbox.fill",   tint = C.orange, title = "光影整合包",     sub = "光影 · 热门 · 更新于 ···" },
@@ -378,43 +392,63 @@ end
 
 -- ============ 下载页（无侧栏、通栏纵向流：两行分段标签 + 卡片）============
 local function buildDownloadPage()
-  local segRows = {}
-  for r, labels in ipairs(CONFIG.download.segRows) do
-    segRows[#segRows + 1] = segmentRow("segR" .. r, labels, "1vh")
-  end
-  local dlLatest = {}
-  for i, it in ipairs(CONFIG.download.latest) do
-    dlLatest[#dlLatest + 1] = listEntry("dl1_" .. i, it.icon, it.tint, it.title, it.sub)
-  end
-  local searchRows = {}
+  -- 右侧内容按分类：dlSec_1 原版(最新版本) / dlSec_2.. 社区资源(搜索+结果列表)
+  local sec1 = card("dlSecCard1", (function()
+    local k = { ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+    for i, it in ipairs(CONFIG.download.latest) do
+      k[#k + 1] = listEntry("dl11_" .. i, it.icon, it.tint, it.title, it.sub)
+    end
+    return k
+  end)())
+  local dlSearch = {}
   for i, lab in ipairs(CONFIG.download.searchLabels) do
-    searchRows[#searchRows + 1] = pickerRow("dlSearchRow" .. i, lab, "…")
+    dlSearch[#dlSearch + 1] = pickerRow("dlSearchRow" .. i, lab, "…")
   end
-  local popular = {}
+  local dlRes = {}
   for i, it in ipairs(CONFIG.download.popular) do
-    popular[#popular + 1] = bigItem("dl4_" .. i, it.icon, it.tint, it.title, it.meta, it.right)
+    dlRes[#dlRes + 1] = bigItem("dl4_" .. i, it.icon, it.tint, it.title, it.meta, it.right)
+  end
+  local kids = {
+    ui.text { id = "dlTitle", text = CONFIG.download.titleByCat[dlSelCat] or "原版游戏", width = "100%",
+      style = { font = "3vh", weight = "bold", color = C.dark } },
+    -- 分类1：原版游戏 → 最新版本
+    ui.column { id = "dlSec_1", width = "100%", crossAlign = "center", spacing = "2vh", children = { sec1 } },
+    -- 分类2..6：社区资源 → 搜索 + 结果列表（同一结构，标题区分）
+    ui.column { id = "dlSec_2", width = "100%", crossAlign = "center", spacing = "2vh", visible = false, children = {
+      card("dlSearchCard", (function()
+        local s = { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+        pushAll(s, dlSearch)
+        s[#s + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
+          children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } }
+        return s
+      end)()),
+      card("dlResultCard", (function()
+        local s = { ui.text { text = "结果", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+        pushAll(s, dlRes)
+        return s
+      end)()),
+    } },
+  }
+  for c = 3, 6 do
+    kids[#kids + 1] = ui.column { id = "dlSec_" .. c, width = "100%", crossAlign = "center",
+      spacing = "2vh", visible = false,
+      children = {
+        card("dlSearchCard" .. c, (function()
+          local s = { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+          pushAll(s, dlSearch)
+          s[#s + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
+            children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } }
+          return s
+        end)()),
+        card("dlResultCard" .. c, (function()
+          local s = { ui.text { text = "结果", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+          pushAll(s, dlRes)
+          return s
+        end)()),
+      } }
   end
   return ui.column { id = "pageDownload", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = pushAll(segRows,
-      {
-        card("dlCard1", (function()
-          local k = { ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-          pushAll(k, dlLatest)
-          return k
-        end)()),
-        card("dlCard2", (function()
-          local k = { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-          pushAll(k, searchRows)
-          k[#k + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
-            children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } }
-          return k
-        end)()),
-        card("dlCard3", (function()
-          local k = { ui.text { text = "热门", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-          pushAll(k, popular)
-          return k
-        end)()),
-      }) }
+    padding = "2.5vh", spacing = "2vh", children = kids }
 end
 
 -- ============ 联机页（两分支 + 输入条 + 提示行 + 房间条目卡）============
@@ -791,6 +825,36 @@ local function refreshDirectorySidebar()
   launcher.view("dirEmpty"):setVisible(count == 0)
 end
 
+-- 下载页左侧分类目录侧栏（仿 PCL PageDownloadLeft：原版游戏 / 社区资源各类）
+local dlSelCat = 1
+local function buildDownloadSidebar()
+  local kids = {}
+  local idx = 0
+  for _, g in ipairs(CONFIG.download.sidebarGroups) do
+    kids[#kids + 1] = ui.text { text = g.name, width = "100%", style = { font = "2.1vh", color = C.mid } }
+    for _, it in ipairs(g.items) do
+      idx = idx + 1
+      kids[#kids + 1] = ui.row { id = it.id, height = "6vh", width = "100%",
+        background = C.card, corner = "0.9vh", hoverColor = C.hover, action = "dlCat:" .. idx,
+        crossAlign = "center", spacing = "1vh", padding = { left = "1.4vh", right = "1.4vh" },
+        children = {
+          ui.image { id = "dlCatDot_" .. idx, icon = "sf:circle", size = "2.6vh", style = { tint = C.mid } },
+          ui.text { text = it.label, weight = 1, style = { font = "2.3vh", color = C.dark } },
+        } }
+    end
+  end
+  return kids
+end
+
+local dlSecVisible = { [1] = true }
+local function refreshDownloadSidebar()
+  for i = 1, #CONFIG.download.titleByCat do
+    local sel = (i == dlSelCat)
+    launcher.view("dlCatDot_" .. i):setImage(sel and "sf:circle.inset.filled" or "sf:circle")
+    launcher.view("dlCatDot_" .. i):setStyle(sel and { tint = C.accent } or { tint = C.mid })
+  end
+end
+
 function build(ui)
   local homeSidebar = buildHomeSidebar()
   local pageHome = buildHomePage()
@@ -835,11 +899,13 @@ function build(ui)
           ui.column { id = "left", width = "32%", background = C.card, crossAlign = "center",
             spacing = "0.4vh", padding = { left = "2vh", right = "2vh", top = "1vh", bottom = "1vh" },
             children = {
-              -- 启动页左栏；其他页切到 leftDir 目录侧栏
+              -- 启动页左栏；下载页=leftDownload 分类目录；其他页=leftDir 游戏目录
               ui.column { id = "leftHome", width = "100%", weight = 1, crossAlign = "center",
                 spacing = "0.4vh", children = homeSidebar },
               ui.column { id = "leftDir", width = "100%", weight = 1, crossAlign = "center",
                 spacing = "0.4vh", visible = false, children = buildDirectorySidebar() },
+              ui.column { id = "leftDownload", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildDownloadSidebar() },
             } },
           ui.content {
             id = "content", weight = 1, initialPage = "home",
@@ -932,8 +998,14 @@ function onPageChange(page)
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(not isFull)
   launcher.view("leftHome"):setVisible(page == "home")
-  launcher.view("leftDir"):setVisible(page ~= "home" and not isFull)
-  if page ~= "home" and not isFull then refreshDirectorySidebar() end
+  launcher.view("leftDownload"):setVisible(page == "download" and not isFull)
+  launcher.view("leftDir"):setVisible(page ~= "home" and page ~= "download" and not isFull)
+  if page == "download" and not isFull then
+    refreshDownloadSidebar()
+    for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
+  elseif page ~= "home" and page ~= "download" and not isFull then
+    refreshDirectorySidebar()
+  end
   if isFull and CONFIG.settingsSubpages[page] then
     selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
   elseif not isFull then
@@ -960,6 +1032,14 @@ function onClick(id)
   end
   if id == "cap.offline" then selectCap(1) return end
   if id == "cap.genuine" then selectCap(2) return end
+  local dlc = id:match("^dlCat:(%d+)$")
+  if dlc then
+    dlSelCat = tonumber(dlc) or 1
+    refreshDownloadSidebar()
+    for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
+    launcher.view("dlTitle"):setText(CONFIG.download.titleByCat[dlSelCat] or "")
+    return
+  end
   local r, i = id:match("^segR(%d+)_(%d+)$")
   if r then selectSegment("segR", tonumber(r), tonumber(i)) return end
   local m = id:match("^segM_(%d+)$")
