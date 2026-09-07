@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.2" }
+  return { name = "PCL 浅色", version = "1.11.3" }
 end
 
 local C = {
@@ -104,6 +104,8 @@ local CONFIG = {
         meta = "提升帧率与游戏体验的核心模组", right = "更新 …   下载 …" },
     },
     searchLabels = { "搜索源", "搜索对象", "搜索关键词" },
+    vanillaTypes = { "最新版本", "正式版", "快照" },
+    installHint = "安装后请留意版本与 Mod 兼容性；Fabric/Forge 需安装对应加载器。",
   },
   online = {
     branch = { "局域网", "在线" },
@@ -394,10 +396,21 @@ end
 local function buildDownloadPage()
   -- 右侧内容按分类：dlSec_1 原版(最新版本) / dlSec_2.. 社区资源(搜索+结果列表)
   local sec1 = card("dlSecCard1", (function()
-    local k = { ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+    local k = {
+      segmentRow("segV", CONFIG.download.vanillaTypes, "1vh"),
+      ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+    }
     for i, it in ipairs(CONFIG.download.latest) do
       k[#k + 1] = listEntry("dl11_" .. i, it.icon, it.tint, it.title, it.sub)
     end
+    k[#k + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh", crossAlign = "center",
+      spacing = "1vh", padding = "1.2vh",
+      children = {
+        ui.text { text = "ⓘ", style = { font = "2.6vh", color = C.accent } },
+        ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2.1vh", color = C.dark } },
+      } }
+    k[#k + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
+      children = { plainButton("dlInstall", "开始下载 / 安装", true) } }
     return k
   end)())
   local dlSearch = {}
