@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.4" }
+  return { name = "PCL 浅色", version = "1.11.5" }
 end
 
 local C = {
@@ -107,6 +107,14 @@ local CONFIG = {
     vanillaTypes = { "最新版本", "正式版", "快照" },
     installHint = "安装后请留意版本与 Mod 兼容性；Fabric/Forge 需安装对应加载器。",
     defaultVersion = "1.20.1", -- 下载页「开始下载」默认安装的版本 id（可改；接版本清单后可动态选）
+    -- 版本分组卡（引擎 download.versions 返回 key；name 为卡片标题；maxRows=卡片最多渲染行数）
+    vanillaGroups = {
+      { key = "release",      name = "正式版" },
+      { key = "snapshot",     name = "快照" },
+      { key = "april_fools",  name = "愚人节版本" },
+      { key = "ancient",      name = "远古版" },
+    },
+    maxVersionRows = 12,     -- 每张版本卡最多渲染的版本行（真实列表很长，滚动超出部分截断）
   },
   online = {
     branch = { "局域网", "在线" },
@@ -393,39 +401,87 @@ local function buildHomePage()
     } }
 end
 
--- ============ 下载页（无侧栏、通栏纵向流：两行分段标签 + 卡片）============
+-- 下载页版本行槽位（icon + 两行小字：版本号 / 发布时间），点击即下载该版本。
+local function versionSlot(cid, idx)
+  return ui.row { id = "dlv_" .. cid .. "_" .. idx, width = "100%", height = "6vh",
+    background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
+    crossAlign = "center", spacing = "1.2vh", padding = { left = "1.4vh", right = "1.4vh" },
+    children = {
+      ui.image { icon = "sf:cube.fill", size = "2.6vh", style = { tint = C.accent } },
+      ui.column { weight = 1, crossAlign = "stretch", spacing = "0.5vh",
+        children = {
+          ui.text { id = "dlv_" .. cid .. "_" .. idx .. "_name", text = "…", width = "100%",
+            style = { font = "2.3vh", color = C.dark } },
+          ui.text { id = "dlv_" .. cid .. "_" .. idx .. "_date", text = "", width = "100%",
+            style = { font = "1.9vh", color = C.mid } },
+        } },
+    } }
+end
+
+local dlGroups = {} -- download.versions 分组缓存（onClick 按 cid/idx 取版本 id 后下载）
+local function refreshDownloadVersions()
+  local p = launcher.service("download", "versions") or {}
+  if type(p) ~= "table" or not p.ok then return end
+  local latest = { latest_release = p.latestRelease, latest_snapshot = p.latestSnapshot }
+  for cid, it in pairs(latest) do
+    launcher.view("dlv_" .. cid .. "_1_name"):setText(it and it.id or "…")
+    launcher.view("dlv_" .. cid .. "_1_date"):setText((it and it.date) or "")
+    dlGroups[cid] = it and { it } or {}
+  end
+  for _, g in ipairs(CONFIG.download.vanillaGroups) do
+    local items = {}
+    for _, grp in ipairs(p.groups or {}) do
+      if grp.key == g.key then items = grp.items or {} end
+    end
+    dlGroups[g.key] = items
+    for i = 1, CONFIG.download.maxVersionRows do
+      local it = items[i]
+      launcher.view("dlv_" .. g.key .. "_" .. i .. "_name"):setText(it and it.id or "")
+      launcher.view("dlv_" .. g.key .. "_" .. i .. "_date"):setText(it and ((it.date) or "") or "")
+    end
+  end
+end
+
+-- ============ 下载页（无侧栏、通栏纵向流：分组卡片）============
 local function buildDownloadPage()
   -- 右侧内容按分类：dlSec_1 原版(最新版本) / dlSec_2.. 社区资源(搜索+结果列表)
-  local sec1 = card("dlSecCard1", (function()
-    local k = {
-      segmentRow("segV", CONFIG.download.vanillaTypes, "1vh"),
-      ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-    }
-    for i, it in ipairs(CONFIG.download.latest) do
-      k[#k + 1] = listEntry("dl11_" .. i, it.icon, it.tint, it.title, it.sub)
-    end
-    k[#k + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh", crossAlign = "center",
-      spacing = "1vh", padding = "1.2vh",
-      children = {
-        ui.text { text = "ⓘ", style = { font = "2.6vh", color = C.accent } },
-        ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2.1vh", color = C.dark } },
-      } }
-    k[#k + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
-      children = { ui.button { id = "dlInstall", label = "开始下载 / 安装", weight = 1, height = "5.5vh",
-        background = C.card, border = BORDER_A, corner = "0.7vh", action = "dlStart",
-        style = { font = "2.4vh", weight = "bold", tint = C.accent } } } }
-    -- 下载进度区（下载中显示）
-    k[#k + 1] = ui.column { id = "dlProgress", width = "100%", visible = false, spacing = "1vh",
-      crossAlign = "stretch",
-      children = {
-        ui.row { height = "1.6vh", background = C.faintBlue, corner = "pill", overflow = "hidden",
-          children = { ui.column { id = "dlBarFill", width = "0%", height = "100%",
-            background = { from = C.accent, to = C.cyan, angle = 0 } } } },
-        ui.text { id = "dlProgressLabel", text = "准备中…", width = "100%",
-          style = { font = "2.2vh", color = C.dark } },
-      } }
-    return k
-  end)())
+  local sec1 = ui.column { id = "dlvRoot", width = "100%", crossAlign = "center", spacing = "2vh",
+    children = (function()
+      local cards = {
+        -- 卡片1：最新版本（最新快照 / 最新版本，可点下载）
+        card("dlLatestCard", {
+          ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+          versionSlot("latest_snapshot", 1), versionSlot("latest_release", 1),
+        }),
+      }
+      -- 卡片2..5：正式版 / 快照 / 愚人节 / 远古版（每张卡 maxVersionRows 行版本槽位）
+      for _, g in ipairs(CONFIG.download.vanillaGroups) do
+        local rows = { ui.text { text = g.name, style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+        for i = 1, CONFIG.download.maxVersionRows do rows[#rows + 1] = versionSlot(g.key, i) end
+        cards[#cards + 1] = card("dlvgCard_" .. g.key, rows)
+      end
+      -- 兼容性提示 + 开始下载 + 下载进度区
+      cards[#cards + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh",
+        crossAlign = "center", spacing = "1vh", padding = "1.2vh",
+        children = {
+          ui.text { text = "ⓘ", style = { font = "2.6vh", color = C.accent } },
+          ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2vh", color = C.dark } },
+        } }
+      cards[#cards + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
+        children = { ui.button { id = "dlInstall", label = "开始下载 / 安装", weight = 1, height = "5.5vh",
+          background = C.card, border = BORDER_A, corner = "0.7vh", action = "dlStart",
+          style = { font = "2.4vh", weight = "bold", tint = C.accent } } } }
+      cards[#cards + 1] = ui.column { id = "dlProgress", width = "100%", visible = false, spacing = "1vh",
+        crossAlign = "stretch",
+        children = {
+          ui.row { height = "1.6vh", background = C.faintBlue, corner = "pill", overflow = "hidden",
+            children = { ui.column { id = "dlBarFill", width = "0%", height = "100%",
+              background = { from = C.accent, to = C.cyan, angle = 0 } } } },
+          ui.text { id = "dlProgressLabel", text = "准备中…", width = "100%",
+            style = { font = "2.2vh", color = C.dark } },
+        } }
+      return cards
+    end)() }
   local dlSearch = {}
   for i, lab in ipairs(CONFIG.download.searchLabels) do
     dlSearch[#dlSearch + 1] = pickerRow("dlSearchRow" .. i, lab, "…")
@@ -1025,6 +1081,11 @@ function onDownloadUpdate(payload)
   launcher.view("dlProgressLabel"):setText(p.finished and ("安装完成（" .. pct .. "%）") or ("下载中 " .. pct .. "%…"))
 end
 
+-- 版本清单异步拉取完成：刷新下载页原版版本分组卡。
+function onRemoteVersions(payload)
+  refreshDownloadVersions()
+end
+
 function onPageChange(page)
   currentPage = page
   -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
@@ -1038,6 +1099,7 @@ function onPageChange(page)
   launcher.view("leftDir"):setVisible(page ~= "home" and page ~= "download" and not isFull)
   if page == "download" and not isFull then
     refreshDownloadSidebar()
+    refreshDownloadVersions()
     for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
   elseif page ~= "home" and page ~= "download" and not isFull then
     refreshDirectorySidebar()
@@ -1073,6 +1135,19 @@ function onClick(id)
     launcher.view("dlProgressLabel"):setText("准备中…")
     launcher.view("dlBarFill"):setStyle({ width = "0%" })
     launcher.service("download", "start", { versionId = CONFIG.download.defaultVersion })
+    return
+  end
+  -- 版本行点击：从分组缓存取版本 id 后真实下载
+  local dlv = id:match("^dlv_(%w+)_(%d+)$")
+  if dlv then
+    local cid, idx = dlv[1], tonumber(dlv[2])
+    local it = (dlGroups[cid] or {})[idx]
+    if it and it.id then
+      launcher.view("dlProgress"):setVisible(true)
+      launcher.view("dlProgressLabel"):setText("准备下载 " .. it.id .. " …")
+      launcher.view("dlBarFill"):setStyle({ width = "0%" })
+      launcher.service("download", "start", { versionId = it.id })
+    end
     return
   end
   local dlc = id:match("^dlCat:(%d+)$")
