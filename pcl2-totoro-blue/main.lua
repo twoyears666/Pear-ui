@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.11.5" }
+  return { name = "PCL 浅色", version = "1.12.0" }
 end
 
 local C = {
@@ -68,7 +68,7 @@ local CONFIG = {
     home = "pageHome", download = "pageDownload", multi = "pageMulti",
     settings = "pageSettings", more = "pageMore", version_settings = "pageVersionSettings",
     versionManager = "pageVersionManager", accountManager = "pageAccountManager",
-    gameDirectory = "pageGameDirectory",
+    gameDirectory = "pageGameDirectory", versionDetail = "pageVersionDetail",
   },
   home = {
     secondaryLinks = { { label = "购买正版", action = "open:download" }, { label = "更换皮肤", action = "open:settings" } },
@@ -115,6 +115,11 @@ local CONFIG = {
       { key = "ancient",      name = "远古版" },
     },
     maxVersionRows = 12,     -- 每张版本卡最多渲染的版本行（真实列表很长，滚动超出部分截断）
+    -- 版本详情页加载器组合（仿 PCL：默认「无」，可切换 Fabric/Forge 等后再下载）
+    loaders = { "无", "Fabric", "Forge", "Quilt", "NeoForge" },
+    -- 分组 key → 版本类型显示名（详情页副标题用，仅结构，不写死具体版本）
+    typeNames = { latest_snapshot = "最新快照", latest_release = "最新正式版",
+      release = "正式版", snapshot = "快照", april_fools = "愚人节版本", ancient = "远古版" },
   },
   online = {
     branch = { "局域网", "在线" },
@@ -235,9 +240,13 @@ local function topTab(t)
 end
 
 -- 白底圆角卡片（vertical_flow 内的一行卡片；内容 94% = 左右留边 3%）
-local function card(id, children)
+-- opts 可选：padding/spacing 覆盖默认留白（保证文字与圆角边框有足够间距），
+--          crossAlign="center" 时子元素按自身宽度居中（用于版本行卡内左右留边）。
+local function card(id, children, opts)
+  opts = opts or {}
   return ui.column { id = id, width = "94%", background = C.card, border = BORDER,
-    corner = "1.2vh", shadow = SHADOW, padding = "2vh", spacing = "1vh", children = children }
+    corner = "1.2vh", shadow = SHADOW, padding = opts.padding or "2.5vh",
+    spacing = opts.spacing or "1.5vh", crossAlign = opts.crossAlign, children = children }
 end
 
 -- 整行条目卡（row_item）：左图标 + 中列(标题/副题) + 右文本；整行可点、hover 浅蓝，图标圆角
@@ -401,24 +410,48 @@ local function buildHomePage()
     } }
 end
 
--- 下载页版本行槽位（icon + 两行小字：版本号 / 发布时间），点击即下载该版本。
+-- 下载页版本行槽位（icon + 两行小字：版本号 / 发布时间）。
+-- width 96% + 卡 crossAlign=center → 与卡片上下、左右均留出间距。
 local function versionSlot(cid, idx)
-  return ui.row { id = "dlv_" .. cid .. "_" .. idx, width = "100%", height = "6vh",
+  return ui.row { id = "dlv_" .. cid .. "_" .. idx, width = "96%", height = "6.5vh",
     background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
-    crossAlign = "center", spacing = "1.2vh", padding = { left = "1.4vh", right = "1.4vh" },
+    crossAlign = "center", spacing = "1.2vh", padding = { left = "1.6vh", right = "1.6vh" },
     children = {
       ui.image { icon = "sf:cube.fill", size = "2.6vh", style = { tint = C.accent } },
       ui.column { weight = 1, crossAlign = "stretch", spacing = "0.5vh",
         children = {
           ui.text { id = "dlv_" .. cid .. "_" .. idx .. "_name", text = "…", width = "100%",
-            style = { font = "2.3vh", color = C.dark } },
+            style = { font = "2.2vh", color = C.dark } },
           ui.text { id = "dlv_" .. cid .. "_" .. idx .. "_date", text = "", width = "100%",
-            style = { font = "1.9vh", color = C.mid } },
+            style = { font = "1.8vh", color = C.mid } },
         } },
+      chevron(),
     } }
 end
 
-local dlGroups = {} -- download.versions 分组缓存（onClick 按 cid/idx 取版本 id 后下载）
+local dlGroups = {} -- download.versions 分组缓存（onClick 按 cid/idx 取版本 id）
+-- 版本详情页状态：dlCurrent=当前查看版本{id,date,cid}；dlLoader=加载器选择索引
+local dlCurrent = nil
+local dlLoader = 1
+
+-- 版本行点击后打开详情页：填入所选版本信息并保持当前页高亮为「下载」。
+local function openDetailFor(cid, idx)
+  local it = (dlGroups[cid] or {})[idx]
+  if not it or not it.id then return end
+  dlCurrent = { id = it.id, date = it.date or "", cid = cid }
+  dlLoader = 1
+  launcher.view("vdVersion"):setText(dlCurrent.id)
+  local tname = (CONFIG.download.typeNames or {})[cid] or "版本"
+  launcher.view("vdType"):setText(tname .. " · " .. dlCurrent.date .. " 发布")
+  local loaders = CONFIG.download.loaders or {}
+  for li = 1, #loaders do
+    local sel = (li == dlLoader)
+    launcher.view("vdL_" .. li):setStyle(sel
+      and { background = C.accent, tint = C.white, corner = "pill" }
+      or  { background = C.transparent, tint = C.dark, corner = "pill" })
+  end
+  launcher.action("open_subpage:versionDetail")
+end
 local function refreshDownloadVersions()
   local p = launcher.service("download", "versions") or {}
   if type(p) ~= "table" or not p.ok then return end
@@ -448,17 +481,18 @@ local function buildDownloadPage()
   local sec1 = ui.column { id = "dlvRoot", width = "100%", crossAlign = "center", spacing = "2vh",
     children = (function()
       local cards = {
-        -- 卡片1：最新版本（最新快照 / 最新版本，可点下载）
+        -- 卡片1：最新版本（最新快照 / 最新版本，可点进入详情）
         card("dlLatestCard", {
-          ui.text { text = "最新版本", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+          ui.text { text = "最新版本", width = "100%", style = { font = "2.8vh", weight = "bold", color = C.dark } },
           versionSlot("latest_snapshot", 1), versionSlot("latest_release", 1),
-        }),
+        }, { crossAlign = "center" }),
       }
       -- 卡片2..5：正式版 / 快照 / 愚人节 / 远古版（每张卡 maxVersionRows 行版本槽位）
       for _, g in ipairs(CONFIG.download.vanillaGroups) do
-        local rows = { ui.text { text = g.name, style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+        local rows = { ui.text { text = g.name, width = "100%",
+          style = { font = "2.8vh", weight = "bold", color = C.dark } } }
         for i = 1, CONFIG.download.maxVersionRows do rows[#rows + 1] = versionSlot(g.key, i) end
-        cards[#cards + 1] = card("dlvgCard_" .. g.key, rows)
+        cards[#cards + 1] = card("dlvgCard_" .. g.key, rows, { crossAlign = "center" })
       end
       -- 兼容性提示 + 开始下载 + 下载进度区
       cards[#cards + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh",
@@ -685,6 +719,52 @@ local function buildVersionSettingsPage()
               style = { font = "2.4vh", tint = C.danger } },
           } },
       }),
+    } }
+end
+
+-- ============ 版本下载详情页（版本信息 + 加载器选择 + 下载；仿 PCL 安装面板）============
+local function buildVersionDetailPage()
+  local loaderRow = {}
+  for i, lab in ipairs(CONFIG.download.loaders or {}) do
+    loaderRow[#loaderRow + 1] = ui.button { id = "vdL_" .. i, label = lab, weight = 1,
+      height = "4.5vh", corner = "pill", action = "vdL_" .. i, hoverColor = C.hover,
+      style = { background = C.transparent, tint = C.dark, font = "2.3vh" } }
+  end
+  return ui.column { id = "pageVersionDetail", weight = 1, crossAlign = "center",
+    padding = "2.5vh", spacing = "2.5vh",
+    children = {
+      -- 页眉：返回下载页 + 标题
+      ui.row { id = "vdHeader", width = "94%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+        children = {
+          ui.button { id = "vdBack", label = "‹ 返回", action = "open:download", width = "22%", height = "5vh",
+            background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
+            style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+          ui.text { text = "版本详情", weight = 1,
+            style = { font = "3vh", weight = "bold", color = C.dark } },
+        } },
+      -- 版本信息卡
+      card("vdInfoCard", {
+        ui.row { width = "100%", crossAlign = "center", spacing = "2vh", padding = "1vh",
+          children = {
+            ui.image { icon = "sf:cube.fill", size = "7vh", corner = "1.3vh",
+              background = { from = C.accent, to = C.cyan, angle = 30 }, style = { tint = C.white } },
+            ui.column { weight = 1, justify = "center", spacing = "0.5vh", children = {
+              ui.text { id = "vdVersion", text = dlCurrent and dlCurrent.id or "· · ·",
+                style = { font = "3vh", weight = "bold", color = C.dark } },
+              ui.text { id = "vdType", text = "请先选择一个版本",
+                style = { font = "2.1vh", color = C.mid } },
+            } },
+          } },
+      }),
+      -- 加载器选择卡
+      card("vdLoaderCard", {
+        ui.text { text = "加载器", width = "100%", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+        ui.row { width = "100%", crossAlign = "center", spacing = "1vh", children = loaderRow },
+      }),
+      -- 下载按钮
+      ui.button { id = "vdInstall", label = "下载并安装", width = "94%", height = "6vh",
+        background = C.accent, corner = "0.9vh", action = "vdInstall",
+        style = { font = "2.6vh", weight = "bold", tint = C.white } },
     } }
 end
 
@@ -951,6 +1031,7 @@ function build(ui)
     buildVersionManagerPage(),
     buildAccountManagerPage(),
     buildGameDirectoryPage(),
+    buildVersionDetailPage(),
   }
   for _tok, _spec in pairs(CONFIG.settingsSubpages) do
     contentChildren[#contentChildren + 1] = buildSettingsSubpage(_tok, _spec)
@@ -1090,7 +1171,7 @@ function onPageChange(page)
   currentPage = page
   -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
   local isFull = (page == "version_settings") or (page == "versionManager")
-    or (page == "accountManager") or (page == "gameDirectory")
+    or (page == "accountManager") or (page == "gameDirectory") or (page == "versionDetail")
     or (CONFIG.settingsSubpages[page] ~= nil)
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(not isFull)
@@ -1104,8 +1185,12 @@ function onPageChange(page)
   elseif page ~= "home" and page ~= "download" and not isFull then
     refreshDirectorySidebar()
   end
-  if isFull and CONFIG.settingsSubpages[page] then
-    selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
+  if isFull then
+    if CONFIG.settingsSubpages[page] then
+      selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
+    elseif page == "versionDetail" then
+      selectTab("tab.download") -- 版本详情页仍高亮「下载」页签
+    end
   elseif not isFull then
     local tabId = PAGE_TAB[page]
     if tabId then selectTab(tabId) end
@@ -1137,20 +1222,38 @@ function onClick(id)
     launcher.service("download", "start", { versionId = CONFIG.download.defaultVersion })
     return
   end
-  -- 版本行点击：从分组缓存取版本 id 后真实下载
+  -- 版本行点击：进入该版本的详情页（信息 + 加载器选择），由详情页发起下载
   local dlv = id:match("^dlv_(%w+)_(%d+)$")
   if dlv then
-    local cid, idx = dlv[1], tonumber(dlv[2])
-    local it = (dlGroups[cid] or {})[idx]
-    if it and it.id then
-      launcher.view("dlProgress"):setVisible(true)
-      launcher.view("dlProgressLabel"):setText("准备下载 " .. it.id .. " …")
-      launcher.view("dlBarFill"):setStyle({ width = "0%" })
-      launcher.service("download", "start", { versionId = it.id })
+    openDetailFor(dlv[1], tonumber(dlv[2]))
+    return
+  end
+  -- 详情页加载器选择
+  local vl = id:match("^vdL_(%d+)$")
+  if vl then
+    dlLoader = tonumber(vl) or 1
+    local loaders = CONFIG.download.loaders or {}
+    for li = 1, #loaders do
+      local sel = (li == dlLoader)
+      launcher.view("vdL_" .. li):setStyle(sel
+        and { background = C.accent, tint = C.white, corner = "pill" }
+        or  { background = C.transparent, tint = C.dark, corner = "pill" })
     end
     return
   end
-  local dlc = id:match("^dlCat:(%d+)$")
+  -- 详情页「下载并安装」：启动下载后返回下载页展示进度
+  if id == "vdInstall" then
+    if dlCurrent and dlCurrent.id then
+      -- loader = CONFIG.download.loaders[dlLoader]，当前真实下载逻辑沿用 versionId
+      launcher.view("dlProgress"):setVisible(true)
+      launcher.view("dlProgressLabel"):setText("准备下载 " .. dlCurrent.id .. " …")
+      launcher.view("dlBarFill"):setStyle({ width = "0%" })
+      launcher.service("download", "start", { versionId = dlCurrent.id })
+      launcher.action("open:download")
+    end
+    return
+  end
+  local dlc = id:match("^dlCat_(%d+)$")
   if dlc then
     dlSelCat = tonumber(dlc) or 1
     refreshDownloadSidebar()
