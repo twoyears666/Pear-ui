@@ -1,4 +1,4 @@
--- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.9.0
+-- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.13.0
 --
 -- 契约（引擎通用，零特例）：
 --   主题：仿 PCL 浅色——蓝顶栏 topbar #0A5FC4、内容区浅蓝灰对角渐变
@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.12.0" }
+  return { name = "PCL 浅色", version = "1.13.1" }
 end
 
 local C = {
@@ -245,8 +245,8 @@ end
 local function card(id, children, opts)
   opts = opts or {}
   return ui.column { id = id, width = "94%", background = C.card, border = BORDER,
-    corner = "1.2vh", shadow = SHADOW, padding = opts.padding or "2.5vh",
-    spacing = opts.spacing or "1.5vh", crossAlign = opts.crossAlign, children = children }
+    corner = "1.2vh", shadow = SHADOW, padding = opts.padding or "3vh",
+    spacing = opts.spacing or "2vh", crossAlign = opts.crossAlign, visible = opts.visible, children = children }
 end
 
 -- 整行条目卡（row_item）：左图标 + 中列(标题/副题) + 右文本；整行可点、hover 浅蓝，图标圆角
@@ -267,11 +267,11 @@ local function listEntry(id, icon, tint, title, sub, rightText, action)
   }
 end
 
-local function bigItem(id, icon, tint, title, meta, rightText)
+local function bigItem(id, icon, tint, title, meta, rightText, action)
   return ui.row {
     id = id, height = "14vh", background = C.card, corner = "1.2vh",
     border = BORDER, shadow = SHADOW, hoverColor = C.hover, crossAlign = "center",
-    padding = { left = "2vh", right = "2vh" }, spacing = "1.8vh",
+    padding = { left = "2vh", right = "2vh" }, spacing = "1.8vh", action = action,
     children = {
       ui.image { icon = icon, size = "10vh", corner = "pill",
         background = { from = tint, to = C.accent, angle = 30 }, style = { tint = C.white } },
@@ -295,7 +295,7 @@ local function segmentRow(id, labels, spacing)
   return ui.row { width = "94%", height = "5.5vh", crossAlign = "center", spacing = spacing, children = kids }
 end
 
-local function pickerRow(id, label, valueText)
+local function pickerRow(id, label, valueText, valueId)
   return ui.row {
     id = id, height = "4.5vh", width = "100%", crossAlign = "center",
     children = {
@@ -305,108 +305,119 @@ local function pickerRow(id, label, valueText)
         border = { width = 1, color = C.fieldBorder }, corner = "0.8vh", crossAlign = "center",
         padding = { left = "1.2vh", right = "1.2vh" },
         children = {
-          ui.text { text = valueText, weight = 1, style = { font = "2.2vh", color = C.dark } },
+          ui.text { id = valueId, text = valueText, weight = 1, style = { font = "2.2vh", color = C.dark } },
           ui.text { text = " ▾", style = { font = "2.2vh", color = C.mid } },
         } },
     },
   }
 end
 
-local function plainButton(id, label, accent)
+local function plainButton(id, label, accent, action)
   return ui.button { id = id, label = label, height = "5.5vh", weight = 1, background = C.card,
-    corner = "0.7vh", border = (accent and BORDER_A or BORDER),
+    corner = "0.7vh", border = (accent and BORDER_A or BORDER), action = action,
     style = { font = "2.4vh", tint = C.dark } }
 end
 
--- ============ 启动页左栏（split_column 左 1/3）============
+-- 设置页分组行：标签 + 当前值 + ›
+local function settingsRow(id, label, value, action)
+  return ui.row {
+    id = id, height = "6.5vh", width = "100%", crossAlign = "center",
+    spacing = "1.5vh", hoverColor = C.hover, action = action,
+    children = {
+      ui.text { text = label, weight = 1, style = { font = "2.5vh", color = C.dark } },
+      ui.text { text = value or "···", style = { font = "2.3vh", color = C.mid } },
+      chevron(),
+    } }
+end
+
+-- ============ 启动页左栏（split_column 左 1/3，仿 PCL2 主页左侧）============
 local function buildHomeSidebar()
   local kids = {}
-  kids[#kids + 1] = ui.spacer { height = "2vh" }
-  -- 胶囊在顶
-  kids[#kids + 1] = ui.row { id = "capsules", width = "85%", height = "3.7vh", spacing = "2vh",
-    children = {
-      ui.button { id = "cap.offline", label = "离线", height = "3.7vh", weight = 1, corner = "pill",
-        action = "cap.offline", hoverColor = C.hover,
-        style = { background = C.accent, tint = C.white, font = "2.4vh", weight = "bold" } },
-      ui.button { id = "cap.genuine", label = "正版", height = "3.7vh", weight = 1, corner = "pill",
-        action = "cap.genuine", border = BORDER_A,
-        style = { background = C.card, tint = C.accent, font = "2.4vh", weight = "bold" } },
-    } }
-  -- 头像在中
-  kids[#kids + 1] = ui.spacer { height = "3vh" }
-  kids[#kids + 1] = ui.image { id = "avatar", icon = "sf:person.crop.circle.fill", size = "11vh",
-    corner = "10vh", background = C.avatarBg, style = { tint = C.avatarLine } }
   kids[#kids + 1] = ui.spacer { height = "2.5vh" }
-  kids[#kids + 1] = ui.row { id = "accountRow", width = "85%", height = "3.5vh", spacing = "1vh",
-    crossAlign = "center",
+  -- 账号类型胶囊：Mojang / 微软 / 离线（PCL2 为三态 pill）
+  kids[#kids + 1] = ui.row { id = "capsules", width = "90%", height = "4vh", spacing = "1vh",
     children = {
-      ui.row { id = "accountPicker", action = "open:accountManager", weight = 1, height = "3.5vh",
-        background = C.card, border = BORDER, corner = "0.8vh", crossAlign = "center", hoverColor = C.hover,
-        padding = { left = "1.2vh", right = "1.2vh" },
-        children = {
-          ui.text { id = "accountPickerLabel", text = "未登录", weight = 1, style = { font = "2.3vh", color = C.dark } },
-          ui.image { icon = "sf:chevron.down", size = "1.8vh", style = { tint = C.mid } },
-        } },
-      ui.button { id = "login", label = "登录", width = "28%", height = "3.5vh", corner = "0.8vh",
-        border = BORDER_A, style = { background = C.card, tint = C.accent, font = "2.4vh", weight = "bold" } },
+      ui.button { id = "cap.mojang", label = "Mojang", height = "4vh", weight = 1, corner = "pill",
+        action = "cap.mojang", hoverColor = C.hover,
+        style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
+      ui.button { id = "cap.microsoft", label = "微软", height = "4vh", weight = 1, corner = "pill",
+        action = "cap.microsoft", hoverColor = C.hover,
+        style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
+      ui.button { id = "cap.offline", label = "离线", height = "4vh", weight = 1, corner = "pill",
+        action = "cap.offline", hoverColor = C.hover,
+        style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
     } }
-  local lnKids = {}
-  for _, ln in ipairs(CONFIG.home.secondaryLinks) do
-    lnKids[#lnKids + 1] = ui.text { text = "» " .. ln.label, action = ln.action,
-      style = { font = "2vh", color = C.mid } }
-  end
-  kids[#kids + 1] = ui.row { id = "links", spacing = "4vh", crossAlign = "center", children = lnKids }
-  -- 按钮组贴底
-  kids[#kids + 1] = ui.spacer { weight = 5 }
-  kids[#kids + 1] = ui.column { id = "launchBtn", action = "launch", width = "85%", height = "9vh",
-    corner = "1.5vh", background = C.card, border = BORDER_A, justify = "center", crossAlign = "center",
-    spacing = "0.5vh",
+  -- 头像在中（PCL2 皮肤预览较大，用像素风格占位）
+  kids[#kids + 1] = ui.spacer { height = "2.5vh" }
+  kids[#kids + 1] = ui.column { id = "avatarBox", width = "15vh", height = "15vh", corner = "1.2vh",
+    background = C.avatarBg, border = BORDER, justify = "center", crossAlign = "center",
     children = {
-      ui.text { id = "launchTitle", text = "启动游戏", style = { font = "3vh", weight = "bold", color = C.dark } },
+      ui.image { id = "avatar", icon = "sf:person.crop.square.fill", size = "10vh",
+        background = C.transparent, style = { tint = C.avatarLine } },
+    } }
+  kids[#kids + 1] = ui.spacer { height = "1.5vh" }
+  kids[#kids + 1] = ui.text { id = "accountName", text = "未登录", width = "90%",
+    style = { font = "2.4vh", weight = "bold", color = C.dark, align = "center" } }
+  kids[#kids + 1] = ui.text { id = "accountType", text = "点击登录账号", width = "90%",
+    style = { font = "2vh", color = C.mid, align = "center" } }
+  kids[#kids + 1] = ui.spacer { height = "1.8vh" }
+  -- 登录 / 管理账号
+  kids[#kids + 1] = ui.button { id = "loginBtn", label = "登录 / 管理账号", width = "90%", height = "5vh",
+    background = C.accent, corner = "0.8vh", action = "open:accountManager",
+    style = { font = "2.3vh", weight = "bold", tint = C.white } }
+  kids[#kids + 1] = ui.row { id = "homeLinks", width = "90%", height = "4vh", crossAlign = "center", spacing = "1vh",
+    children = {
+      ui.button { id = "linkBuy", label = "购买正版", weight = 1, height = "4vh", corner = "pill",
+        action = "open:download", hoverColor = C.hover,
+        style = { background = C.transparent, tint = C.mid, font = "1.9vh" } },
+      ui.button { id = "linkSkin", label = "更换皮肤", weight = 1, height = "4vh", corner = "pill",
+        action = "open:settings", hoverColor = C.hover,
+        style = { background = C.transparent, tint = C.mid, font = "1.9vh" } },
+    } }
+  kids[#kids + 1] = ui.spacer { height = "2vh" }
+  -- 启动游戏大按钮：白底 + 蓝色边框（PCL2 风格）
+  kids[#kids + 1] = ui.column { id = "launchBtn", action = "launch", width = "90%", height = "10vh",
+    corner = "1.2vh", background = C.card, border = BORDER_A, justify = "center", crossAlign = "center",
+    spacing = "0.6vh", hoverColor = C.hover,
+    children = {
+      ui.text { id = "launchTitle", text = "启动游戏", style = { font = "3.2vh", weight = "bold", color = C.accent } },
       ui.text { id = "launchSub", text = "尚未选择版本", style = { font = "2.2vh", color = C.mid } },
     } }
-  kids[#kids + 1] = ui.spacer { height = "1vh" }
-  kids[#kids + 1] = ui.row { id = "versionRow", width = "85%", height = "5.5vh", spacing = "1vh",
+  kids[#kids + 1] = ui.spacer { weight = 1 }
+  -- 版本选择 / 版本设置（PCL2 底部并排按钮）
+  kids[#kids + 1] = ui.row { id = "versionRow", width = "90%", height = "5.5vh", spacing = "1.2vh",
     children = {
-      ui.button { id = "pickVersion", label = "选择版本", action = "open:versionManager", weight = 1,
-        height = "5.5vh", corner = "1vh", border = BORDER, hoverColor = C.hover,
+      ui.button { id = "pickVersion", label = "版本选择", action = "open:versionManager", weight = 1,
+        height = "5.5vh", corner = "0.8vh", border = BORDER, hoverColor = C.hover,
         style = { background = C.card, tint = C.dark, font = "2.4vh", weight = "bold" } },
       ui.button { id = "versionSetup", label = "版本设置", action = "open:version_settings", weight = 1,
-        height = "5.5vh", corner = "1vh", border = BORDER, hoverColor = C.hover,
+        height = "5.5vh", corner = "0.8vh", border = BORDER, hoverColor = C.hover,
         style = { background = C.card, tint = C.dark, font = "2.4vh", weight = "bold" } },
     } }
   kids[#kids + 1] = ui.spacer { height = "2vh" }
   return kids
 end
 
--- ============ 启动页右区（vertical_flow：白卡纵向堆叠）============
+-- ============ 启动页右区（仿 PCL2 主页右侧大公告卡片）============
 local function buildHomePage()
   return ui.column { id = "pageHome", weight = 1, crossAlign = "center", padding = "2.5vh",
     spacing = "2.5vh",
     children = {
-      card("homeWelcome", {
-        ui.row { width = "100%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+      card("homeNotice", {
+        ui.row { width = "100%", height = "5vh", crossAlign = "center", spacing = "1.5vh",
           children = {
-            ui.image { icon = "sf:sparkles", size = "5vh", corner = "1vh",
-              background = { from = C.accent, to = C.cyan, angle = 30 }, style = { tint = C.white } },
-            ui.column { weight = 1, justify = "center", spacing = "0.4vh", children = {
-              ui.text { text = "欢迎使用 Pear 启动器", style = { font = "3vh", weight = "bold", color = C.dark } },
-              ui.text { text = "在这里开始你的世界", style = { font = "2.1vh", color = C.mid } },
-            } },
+            ui.image { icon = "sf:info.circle.fill", size = "4vh", corner = "pill",
+              background = C.faintBlue, style = { tint = C.accent } },
+            ui.text { text = "公告", style = { font = "2.8vh", weight = "bold", color = C.dark } },
           } },
-        ui.divider { height = "0.2vh", background = "#D9E4F0" },
-        ui.text { text = "· 关注版本更新与社区动态 ·", style = { font = "2.1vh", color = C.mid } },
-      }),
-      card("homeQuick", {
-        ui.text { text = "快速开始", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-        listEntry("homeQ1", "sf:cube.fill", C.green, "选择版本", "尚未选择游戏版本", "›", "open:versionManager"),
-        listEntry("homeQ2", "sf:person.3.fill", C.orange, "登录账号", "未登录", "›", "open:accountManager"),
-      }),
-      card("homeNews", {
-        ui.text { text = "近期动态", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-        listEntry("homeN1", "sf:newspaper.fill", C.cyan, "启动器更新日志", "查看最近更改与已知问题", "›", "open:more"),
-        listEntry("homeN2", "sf:cloud.fill", C.purple, "版本镜像与资源", "下载源与资源中心入口", "›", "open:download"),
-      }),
+        ui.divider { height = "0.2vh", background = C.cardBorder },
+        ui.text { text = "欢迎使用 Pear 启动器。", style = { font = "2.4vh", color = C.dark } },
+        ui.text { text = "· 在左侧选择账号类型并登录。\n· 点击「版本选择」安装或切换游戏版本。\n· 点击「启动游戏」即可开始游玩。",
+          style = { font = "2.2vh", color = C.mid, lineSpacing = "1.6vh" } },
+        ui.button { id = "homeNoticeBtn", label = "了解更多", width = "28vh", height = "5vh",
+          background = C.accent, corner = "0.8vh", action = "open:more",
+          style = { font = "2.3vh", weight = "bold", tint = C.white } },
+      }, { spacing = "2vh" }),
     } }
 end
 
@@ -430,6 +441,7 @@ local function versionSlot(cid, idx)
 end
 
 local dlGroups = {} -- download.versions 分组缓存（onClick 按 cid/idx 取版本 id）
+local dlExpanded = {} -- 下载页版本分组折叠状态
 -- 版本详情页状态：dlCurrent=当前查看版本{id,date,cid}；dlLoader=加载器选择索引
 local dlCurrent = nil
 local dlLoader = 1
@@ -467,11 +479,21 @@ local function refreshDownloadVersions()
       if grp.key == g.key then items = grp.items or {} end
     end
     dlGroups[g.key] = items
+    local count = #items
+    local cntView = launcher.view("dlgCount_" .. g.key)
+    if cntView then cntView:setText("(" .. count .. ")") end
     for i = 1, CONFIG.download.maxVersionRows do
       local it = items[i]
       launcher.view("dlv_" .. g.key .. "_" .. i .. "_name"):setText(it and it.id or "")
       launcher.view("dlv_" .. g.key .. "_" .. i .. "_date"):setText(it and ((it.date) or "") or "")
     end
+  end
+end
+
+local function refreshDownloadGroupVisibility()
+  for _, g in ipairs(CONFIG.download.vanillaGroups) do
+    local v = launcher.view("dlgCard_" .. g.key)
+    if v then v:setVisible(dlExpanded[g.key] == true) end
   end
 end
 
@@ -487,12 +509,22 @@ local function buildDownloadPage()
           versionSlot("latest_snapshot", 1), versionSlot("latest_release", 1),
         }, { crossAlign = "center" }),
       }
-      -- 卡片2..5：正式版 / 快照 / 愚人节 / 远古版（每张卡 maxVersionRows 行版本槽位）
+      -- 卡片2..5：可折叠分组标题 + 版本槽位卡片（仿 PCL2 下载页）
       for _, g in ipairs(CONFIG.download.vanillaGroups) do
-        local rows = { ui.text { text = g.name, width = "100%",
-          style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+        cards[#cards + 1] = ui.row {
+          id = "dlgHeader_" .. g.key, width = "94%", height = "6.5vh", background = C.card,
+          border = BORDER, corner = "1.2vh", shadow = SHADOW, hoverColor = C.hover,
+          crossAlign = "center", padding = { left = "2vh", right = "2vh" }, spacing = "1.5vh",
+          action = "dlgHeader:" .. g.key,
+          children = {
+            ui.text { text = g.name, weight = 1, style = { font = "2.8vh", weight = "bold", color = C.dark } },
+            ui.text { id = "dlgCount_" .. g.key, text = "(0)", style = { font = "2.2vh", color = C.mid } },
+            chevron(),
+          } }
+        local rows = {}
         for i = 1, CONFIG.download.maxVersionRows do rows[#rows + 1] = versionSlot(g.key, i) end
-        cards[#cards + 1] = card("dlvgCard_" .. g.key, rows, { crossAlign = "center" })
+        cards[#cards + 1] = card("dlgCard_" .. g.key, rows,
+          { crossAlign = "center", visible = (dlExpanded[g.key] == true) })
       end
       -- 兼容性提示 + 开始下载 + 下载进度区
       cards[#cards + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh",
@@ -522,7 +554,7 @@ local function buildDownloadPage()
   end
   local dlRes = {}
   for i, it in ipairs(CONFIG.download.popular) do
-    dlRes[#dlRes + 1] = bigItem("dl4_" .. i, it.icon, it.tint, it.title, it.meta, it.right)
+    dlRes[#dlRes + 1] = bigItem("dl4_" .. i, it.icon, it.tint, it.title, it.meta, it.right, "dlPopular:" .. i)
   end
   local kids = {
     ui.text { id = "dlTitle", text = CONFIG.download.titleByCat[dlSelCat] or "原版游戏", width = "100%",
@@ -614,9 +646,10 @@ local function buildMultiPage()
     } }
 end
 
--- ============ 设置页（1 版本信息卡 + N 白卡条目，说明文字紧跟卡片下方）============
+-- ============ 设置页（PCL2 风格：关于卡 + 分组白卡，每组标题 + 行）============
 local function buildSettingsPage()
   local kids = {}
+  -- 关于卡
   kids[#kids + 1] = ui.column { id = "setAbout", width = "94%", background = C.card, border = BORDER,
     corner = "1.2vh", shadow = SHADOW, padding = "3vh", crossAlign = "center", spacing = "1.2vh",
     children = {
@@ -626,27 +659,27 @@ local function buildSettingsPage()
       ui.text { text = "版本 · · ·", style = { font = "2.2vh", color = C.mid } },
       ui.text { text = "系统信息 …  ·  设备架构 …", style = { font = "2.2vh", color = C.mid } },
     } }
-  local list = launcher.state and launcher.state.settings
-  if type(list) ~= "table" then list = {} end
-  for i, s in ipairs(list) do
-    local entry = {
-      ui.row { id = "set" .. i, height = "7vh", background = C.card, border = BORDER,
-        corner = "1.2vh", shadow = SHADOW, crossAlign = "center", spacing = "1.6vh",
-        padding = "1.8vh", hoverColor = C.hover, action = (s.action or "open:settings"),
-        children = {
-          ui.image { icon = s.icon or "sf:gearshape.fill", size = "4.5vh", corner = "1vh",
-            background = C.accent, style = { tint = C.white } },
-          ui.text { text = s.label or "", weight = 1, style = { font = "2.7vh", color = C.dark } },
-          chevron(),
-        } },
-    }
-    -- 三条带说明的条目：说明文字紧跟卡片下方、左对齐
-    if type(s.desc) == "string" and #s.desc > 0 then
-      entry[#entry + 1] = ui.text { text = s.desc, width = "100%",
-        style = { font = "2vh", color = C.mid } }
+  local order = { "launcher_settings", "download_mirror", "video_settings", "gl_renderer",
+                  "control_keys", "java_tuning", "ui_theme", "ai_assistant" }
+  for _, token in ipairs(order) do
+    local spec = CONFIG.settingsSubpages[token]
+    if spec then
+      local rows = {}
+      for gi, g in ipairs(spec.groups or {}) do
+        if gi > 1 then
+          rows[#rows + 1] = ui.divider { height = "0.2vh", background = C.cardBorder }
+        end
+        rows[#rows + 1] = ui.text { text = g.name or "", width = "100%",
+          style = { font = "2.1vh", color = C.mid } }
+        for ri, r in ipairs(g.rows or {}) do
+          rows[#rows + 1] = settingsRow("setRow_" .. token .. "_" .. gi .. "_" .. ri,
+            r.label, r.value, "open_subpage:" .. token)
+        end
+      end
+      if #rows > 0 then
+        kids[#kids + 1] = card("setCard_" .. token, rows, { spacing = "1.2vh" })
+      end
     end
-    kids[#kids + 1] = ui.column { id = "setCol" .. i, width = "94%", spacing = "0.6vh",
-      crossAlign = "stretch", children = entry }
   end
   if #kids == 1 then
     kids[#kids + 1] = ui.text { text = "启动器暂未提供设置条目。", style = { font = "2.2vh", color = C.mid } }
@@ -655,9 +688,9 @@ local function buildSettingsPage()
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
--- ============ 更多页（居中标题 + 4 分组：灰字组名 + 白卡多行条目）============
+-- ============ 更多页（左侧分类 + 右侧分组卡片，仿 PCL 更多页）============
 local function buildMorePage()
-  local kids = { ui.text { text = "更多", style = { font = "4vh", weight = "bold", color = C.dark } } }
+  local kids = {}
   for _, g in ipairs(CONFIG.moreGroups) do
     local rows = {}
     for _, rr in ipairs(g.rows) do
@@ -671,53 +704,141 @@ local function buildMorePage()
         spacing = "1.6vh", padding = "1.8vh", hoverColor = C.hover, action = (rr.action or "open:more"),
         children = {
           ui.image { icon = rr.icon or "sf:gearshape.fill", size = "4.5vh",
-            corner = "1vh", background = C.faintBlue, style = { tint = C.accent } },
+            corner = "pill", background = C.faintBlue, style = { tint = C.accent } },
           ui.text { text = rr.label, weight = 1, style = { font = "2.7vh", color = C.dark } },
           rightNode,
         } }
     end
-    kids[#kids + 1] = ui.column { width = "94%", spacing = "1vh", crossAlign = "stretch",
+    kids[#kids + 1] = ui.column { id = "moreSec_" .. g.name, width = "94%", spacing = "1.2vh",
+      crossAlign = "stretch",
       children = {
-        ui.text { text = g.name, width = "100%", style = { font = "2.1vh", color = C.mid } },
+        ui.text { text = g.name, width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
         ui.column { background = C.card, border = BORDER, corner = "1.2vh", shadow = SHADOW,
           padding = "1vh", spacing = "0.5vh", children = rows },
       } }
+  end
+  if #kids == 0 then
+    kids[#kids + 1] = ui.text { text = "暂无更多选项。", style = { font = "2.2vh", color = C.mid } }
   end
   return ui.column { id = "pageMore", weight = 1, crossAlign = "center",
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
--- ============ 版本设置二级页（回到一级页可返回；不规格外）============
+-- ============ 版本设置页（PCL2 风格：概览 / 设置 / Mod 管理 / 资源 / 高级）============
+local VS_SETTING_LABELS = {
+  versionIsolation = "默认版本隔离",
+  windowTitle      = "游戏窗口标题",
+  windowInfo       = "自定义信息",
+  javaVersion      = "游戏 Java",
+  ramType          = "内存分配",
+  ram              = "内存大小",
+  ramOptimize      = "启动前内存优化",
+  serverIp         = "服务器地址",
+  loginMode        = "登录模式",
+}
 local function buildVersionSettingsPage()
+  local section = function(token, title, children)
+    return ui.column { id = "vsSec_" .. token, width = "100%", crossAlign = "center",
+      spacing = "2.5vh", visible = (token == vsSelCat), children = children }
+  end
+  -- 概览：版本信息 + 个性化 + 快捷方式 + 高级管理
+  local overviewRows = {
+    card("vsOverviewCard", {
+      ui.row { width = "100%", height = "11vh", crossAlign = "center", spacing = "2vh", padding = "1vh",
+        children = {
+          ui.image { icon = "sf:doc.text.fill", size = "6vh", background = C.accent,
+            corner = "1.2vh", style = { tint = C.white } },
+          ui.column { weight = 1, justify = "center", spacing = "0.4vh", children = {
+            ui.text { id = "vsName", text = "· · ·", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+            ui.text { id = "vsMeta", text = "版本信息 · · ·", style = { font = "2.1vh", color = C.mid } },
+          } },
+        } },
+    }, { spacing = "1.2vh" }),
+    card("vsPersonalize", {
+      ui.text { text = "个性化", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+      pickerRow("vsIcon",     "图标", "自动", "vsIconVal"),
+      pickerRow("vsCategory", "分类", "自动", "vsCategoryVal"),
+      ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
+        children = {
+          plainButton("vsRename", "修改版本名", false),
+          plainButton("vsDesc",   "修改描述",   false),
+          plainButton("vsFav",    "加入收藏夹", false),
+        } },
+    }, { spacing = "1.8vh" }),
+    card("vsShortcuts", {
+      ui.text { text = "快捷方式", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+      ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
+        children = {
+          plainButton("vsOpenDir",   "版本文件夹", false, "vsOpenDir"),
+          plainButton("vsOpenSaves", "存档文件夹", false, "vsOpenSaves"),
+          plainButton("vsOpenMods",  "Mod 文件夹", false, "vsOpenMods"),
+        } },
+    }, { spacing = "1.8vh" }),
+    card("vsAdvOverview", {
+      ui.text { text = "高级管理", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+      ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
+        children = {
+          plainButton("vsExport",   "导出启动脚本", false),
+          plainButton("vsComplete", "补全文件",     false, "vsComplete"),
+        } },
+      ui.button { id = "vsDeleteTop", label = "删除本版本", width = "100%", height = "5.5vh",
+        background = C.card, border = BORDER_D, corner = "0.7vh", action = "vsDelete",
+        style = { font = "2.4vh", tint = C.danger } },
+    }, { spacing = "1.8vh" }),
+  }
+  -- 设置：从 engine versionSettings.list 动态取值
+  local settingsRows = {}
+  for _, k in ipairs({"versionIsolation","windowTitle","windowInfo","javaVersion","ramType","ram","ramOptimize","serverIp","loginMode"}) do
+    settingsRows[#settingsRows + 1] = pickerRow("vsSet_" .. k, VS_SETTING_LABELS[k] or k, "···", "vsSet_" .. k .. "Val")
+  end
+  settingsRows[#settingsRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
+    children = { plainButton("vsReset", "重置版本设置", false, "vsReset") } }
+
+  -- Mod 管理
+  local modRows = {
+    ui.row { width = "100%", height = "5.5vh", background = C.card, border = BORDER,
+      corner = "0.8vh", crossAlign = "center", padding = { left = "1.5vh", right = "1.5vh" }, spacing = "1.2vh",
+      children = {
+        ui.image { icon = "sf:magnifyingglass", size = "2.6vh", style = { tint = C.mid } },
+        ui.text { text = "搜索 Mod 名称 / 描述 / 标签", weight = 1, style = { font = "2.2vh", color = C.mid } },
+      } },
+    ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh",
+      children = {
+        plainButton("vsModOpenDir",    "打开文件夹",   false, "vsOpenMods"),
+        plainButton("vsModInstallFile","从文件安装",   false),
+        plainButton("vsModDownload",   "下载新 Mod",   false),
+        plainButton("vsModSelectAll",  "全选",         false),
+      } },
+    ui.text { id = "vsModEmpty", text = "当前版本未安装 Mod 加载器或暂无 Mod。",
+      width = "100%", style = { font = "2.4vh", color = C.mid } },
+    ui.button { id = "vsModInstallLoader", label = "安装 Forge/Fabric", width = "100%", height = "5.5vh",
+      background = C.accent, corner = "0.8vh", action = "vsModInstall",
+      style = { font = "2.4vh", weight = "bold", tint = C.white } },
+  }
+
   return ui.column { id = "pageVersionSettings", weight = 1, crossAlign = "center",
-    padding = "3vh", spacing = "3vh",
+    padding = "2.5vh", spacing = "2.5vh",
     children = {
-      card("vsInfo", {
-        ui.row { width = "100%", height = "11vh", crossAlign = "center", spacing = "2vh", padding = "1vh",
-          children = {
-            ui.image { icon = "sf:doc.text.fill", size = "6vh", background = C.accent,
-              corner = "1.2vh", style = { tint = C.white } },
-            ui.column { weight = 1, justify = "center", spacing = "0.4vh", children = {
-              ui.text { text = "· · ·", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-              ui.text { text = "版本信息 · · ·", style = { font = "2.1vh", color = C.mid } },
+      section("info",     "概览",       overviewRows),
+      section("launch",   "设置",       { card("vsSettingsCard", settingsRows, { spacing = "1.8vh" }) }),
+      section("mod",      "Mod 管理",   { card("vsModCard", modRows, { spacing = "1.8vh" }) }),
+      section("resource", "资源包 / 光影", {
+        card("vsResource", {
+          listEntry("vsResPack", "sf:sun.max.fill", C.orange, "资源包", "管理当前版本资源包", "›", "vsResPack"),
+          listEntry("vsShader",  "sf:sparkles",     C.cyan,   "光影包", "管理当前版本光影包", "›", "vsShader"),
+        }),
+      }),
+      section("advanced", "高级管理", {
+        card("vsAdv", {
+          ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
+            children = {
+              plainButton("vsAdv1", "打开安装目录", false, "vsOpenDir"),
+              plainButton("vsAdv2", "重置版本",     false, "vsReset"),
             } },
-          } },
-      }),
-      card("vsPick", {
-        pickerRow("vsPick1", "启动方式", "· · ·"),
-        pickerRow("vsPick2", "游戏目录", "· · ·"),
-        ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
-          children = { plainButton("vsBtn1", "重选", false), plainButton("vsBtn2", "刷新", false) } },
-      }),
-      card("vsAdv", {
-        ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
-          children = {
-            plainButton("vsAdv1", "打开安装目录", false),
-            plainButton("vsAdv2", "重置版本", false),
-            ui.button { id = "vsAdvDanger", label = "删除本版本", weight = 1, height = "5.5vh",
-              background = C.card, border = BORDER_D, corner = "0.7vh",
-              style = { font = "2.4vh", tint = C.danger } },
-          } },
+          ui.button { id = "vsAdvDanger", label = "删除本版本", width = "100%", height = "5.5vh",
+            background = C.card, border = BORDER_D, corner = "0.7vh", action = "vsDelete",
+            style = { font = "2.4vh", tint = C.danger } },
+        }),
       }),
     } }
 end
@@ -807,39 +928,40 @@ local function buildVersionManagerPage()
     padding = "2.5vh", spacing = "2.5vh", children = kids }
 end
 
--- ============ 通用设置子页（token → 标题 + 分组白卡；返回设置）============
+-- ============ 通用设置子页（token → 标题 + 单一大白卡分组条目；返回设置）============
 local function buildSettingsSubpage(token, spec)
-  local kids = {
-    ui.row { id = "sub" .. token .. "Header", width = "94%", height = "6vh",
-      crossAlign = "center", spacing = "1.5vh",
-      children = {
-        ui.button { id = "sub" .. token .. "Back", label = "‹ 返回", action = "open:settings",
-          width = "22%", height = "5vh", background = C.card, border = BORDER, corner = "0.8vh",
-          hoverColor = C.hover, style = { font = "2.4vh", weight = "bold", tint = C.dark } },
-        ui.text { text = spec.title or "", weight = 1,
-          style = { font = "3vh", weight = "bold", color = C.dark } },
-      } },
-  }
+  local cardRows = {}
   for gi, g in ipairs(spec.groups or {}) do
-    local rows = {}
+    if gi > 1 then
+      cardRows[#cardRows + 1] = ui.divider { height = "0.2vh", background = C.cardBorder }
+    end
+    cardRows[#cardRows + 1] = ui.text { text = g.name or "", width = "100%",
+      style = { font = "2.1vh", color = C.mid } }
     for ri, r in ipairs(g.rows or {}) do
-      rows[#rows + 1] = ui.row { id = "sub" .. token .. "r" .. gi .. "_" .. ri, height = "6.5vh",
-        crossAlign = "center", padding = "1.8vh", spacing = "1.6vh", hoverColor = C.hover,
+      cardRows[#cardRows + 1] = ui.row { id = "sub" .. token .. "r" .. gi .. "_" .. ri,
+        height = "6.5vh", crossAlign = "center", padding = "1.8vh", spacing = "1.6vh",
+        hoverColor = C.hover, action = "subRow:" .. token .. ":" .. gi .. "_" .. ri,
         children = {
           ui.text { text = r.label or "", weight = 1, style = { font = "2.6vh", color = C.dark } },
           ui.text { text = r.value or "", style = { font = "2.4vh", color = C.accent } },
           chevron(),
         } }
     end
-    kids[#kids + 1] = ui.column { width = "94%", spacing = "1vh", crossAlign = "stretch",
-      children = {
-        ui.text { text = g.name or "", width = "100%", style = { font = "2.1vh", color = C.mid } },
-        ui.column { background = C.card, border = BORDER, corner = "1.2vh", shadow = SHADOW,
-          padding = "1vh", spacing = "0.5vh", children = rows },
-      } }
   end
   return ui.column { id = "sub_" .. token, weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "2.5vh", spacing = "2.5vh",
+    children = {
+      ui.row { id = "sub" .. token .. "Header", width = "94%", height = "6vh",
+        crossAlign = "center", spacing = "1.5vh",
+        children = {
+          ui.button { id = "sub" .. token .. "Back", label = "‹ 返回", action = "open:settings",
+            width = "22%", height = "5vh", background = C.card, border = BORDER, corner = "0.8vh",
+            hoverColor = C.hover, style = { font = "2.4vh", weight = "bold", tint = C.dark } },
+          ui.text { text = spec.title or "", weight = 1,
+            style = { font = "3vh", weight = "bold", color = C.dark } },
+        } },
+      card("sub" .. token .. "Card", cardRows, { spacing = "1vh" }),
+    } }
 end
 
 -- ============ 账号管理二级页（已登录账号列表 + 返回首页）============
@@ -987,6 +1109,60 @@ local function refreshDirectorySidebar()
   launcher.view("dirEmpty"):setVisible(count == 0)
 end
 
+-- 通用侧边栏条目：左图标 + 标题，可选选中指示（圆点）
+local function sidebarItem(id, icon, label, action, dotId)
+  return ui.row {
+    id = id, height = "6vh", width = "100%", background = C.card, corner = "0.9vh",
+    hoverColor = C.hover, action = action, crossAlign = "center", spacing = "1vh",
+    padding = { left = "1.4vh", right = "1.4vh" },
+    children = {
+      icon and ui.image { icon = icon, size = "3vh", corner = "pill",
+        background = C.faintBlue, style = { tint = C.accent } } or nil,
+      dotId and ui.image { id = dotId, icon = "sf:circle", size = "2.6vh", style = { tint = C.mid } } or nil,
+      ui.text { text = label, weight = 1, style = { font = "2.3vh", color = C.dark } },
+    } }
+end
+
+-- 设置页左侧分类目录侧栏（仿 PCL PageSetupLeft）
+local setSelCat = "launcher_settings"
+local function buildSettingsSidebar()
+  local kids = { ui.text { text = "设置", width = "100%", style = { font = "2.1vh", color = C.mid } } }
+  for i, s in ipairs(launcher.state and launcher.state.settings or {}) do
+    local token = s.action and s.action:match("open_subpage:(.+)")
+    if token then
+      kids[#kids + 1] = sidebarItem("setCat_" .. token, s.icon, s.label, "setCat:" .. token)
+    end
+  end
+  return kids
+end
+
+-- 版本设置页左侧分类目录侧栏（仿 PCL PageVersionSetupLeft）
+local vsSelCat = "info"
+local VS_CATS = {
+  { token = "info",     label = "概览",       icon = "sf:info.circle.fill" },
+  { token = "launch",   label = "设置",       icon = "sf:play.fill" },
+  { token = "mod",      label = "Mod 管理",   icon = "sf:hud" },
+  { token = "resource", label = "资源包 / 光影", icon = "sf:sun.max.fill" },
+  { token = "advanced", label = "高级管理",   icon = "sf:gearshape.2.fill" },
+}
+local function buildVersionSettingsSidebar()
+  local kids = { ui.text { text = "版本设置", width = "100%", style = { font = "2.1vh", color = C.mid } } }
+  for _, c in ipairs(VS_CATS) do
+    kids[#kids + 1] = sidebarItem("vsCat_" .. c.token, c.icon, c.label, "vsCat:" .. c.token)
+  end
+  return kids
+end
+
+-- 更多页左侧分类目录侧栏
+local moreSelCat = "launch"
+local function buildMoreSidebar()
+  local kids = { ui.text { text = "更多", width = "100%", style = { font = "2.1vh", color = C.mid } } }
+  for _, g in ipairs(CONFIG.moreGroups) do
+    kids[#kids + 1] = sidebarItem("moreCat_" .. g.name, nil, g.name, "moreCat:" .. g.name)
+  end
+  return kids
+end
+
 -- 下载页左侧分类目录侧栏（仿 PCL PageDownloadLeft：原版游戏 / 社区资源各类）
 local dlSelCat = 1
 local function buildDownloadSidebar()
@@ -996,13 +1172,7 @@ local function buildDownloadSidebar()
     kids[#kids + 1] = ui.text { text = g.name, width = "100%", style = { font = "2.1vh", color = C.mid } }
     for _, it in ipairs(g.items) do
       idx = idx + 1
-      kids[#kids + 1] = ui.row { id = it.id, height = "6vh", width = "100%",
-        background = C.card, corner = "0.9vh", hoverColor = C.hover, action = "dlCat:" .. idx,
-        crossAlign = "center", spacing = "1vh", padding = { left = "1.4vh", right = "1.4vh" },
-        children = {
-          ui.image { id = "dlCatDot_" .. idx, icon = "sf:circle", size = "2.6vh", style = { tint = C.mid } },
-          ui.text { text = it.label, weight = 1, style = { font = "2.3vh", color = C.dark } },
-        } }
+      kids[#kids + 1] = sidebarItem(it.id, nil, it.label, "dlCat:" .. idx, "dlCatDot_" .. idx)
     end
   end
   return kids
@@ -1062,13 +1232,19 @@ function build(ui)
           ui.column { id = "left", width = "32%", background = C.card, crossAlign = "center",
             spacing = "0.4vh", padding = { left = "2vh", right = "2vh", top = "1vh", bottom = "1vh" },
             children = {
-              -- 启动页左栏；下载页=leftDownload 分类目录；其他页=leftDir 游戏目录
+              -- 启动页左栏；下载页=leftDownload 分类目录；设置/版本设置/更多页使用独立侧栏；其他页=leftDir 游戏目录
               ui.column { id = "leftHome", width = "100%", weight = 1, crossAlign = "center",
                 spacing = "0.4vh", children = homeSidebar },
               ui.column { id = "leftDir", width = "100%", weight = 1, crossAlign = "center",
                 spacing = "0.4vh", visible = false, children = buildDirectorySidebar() },
               ui.column { id = "leftDownload", width = "100%", weight = 1, crossAlign = "center",
                 spacing = "0.4vh", visible = false, children = buildDownloadSidebar() },
+              ui.column { id = "leftSettings", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildSettingsSidebar() },
+              ui.column { id = "leftVersionSettings", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildVersionSettingsSidebar() },
+              ui.column { id = "leftMore", width = "100%", weight = 1, crossAlign = "center",
+                spacing = "0.4vh", visible = false, children = buildMoreSidebar() },
             } },
           ui.content {
             id = "content", weight = 1, initialPage = "home",
@@ -1084,7 +1260,9 @@ end
 -- ===== 交互 =====
 
 local currentPage = "home"
-local selectedCap = 1
+local selectedCap = 3
+local CAPS = { "mojang", "microsoft", "offline" }
+local CAPS_LABEL = { "Mojang", "微软", "离线" }
 local segSel = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 }
 
 local function selectTab(tabId)
@@ -1098,12 +1276,16 @@ end
 
 local function selectCap(idx)
   selectedCap = idx
-  for i = 1, 2 do
+  for i, key in ipairs(CAPS) do
     local sel = (i == idx)
-    launcher.view("cap." .. (i == 1 and "offline" or "genuine")):setStyle(sel
+    launcher.view("cap." .. key):setStyle(sel
       and { background = C.accent, tint = C.white, borderWidth = 1.5, borderColor = C.accent }
       or  { background = C.card, tint = C.accent, borderWidth = 1.5, borderColor = C.accent })
   end
+  local acc = launcher.state and launcher.state.account
+  local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
+  launcher.view("accountName"):setText(name)
+  launcher.view("accountType"):setText(CAPS_LABEL[idx])
 end
 
 -- 分段标签选中：白底全圆药丸
@@ -1126,7 +1308,7 @@ end
 local function refreshAccount()
   local acc = launcher.state and launcher.state.account
   local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
-  launcher.view("accountPickerLabel"):setText(name)
+  launcher.view("accountName"):setText(name)
 end
 
 local function refreshVersion()
@@ -1149,7 +1331,7 @@ end
 
 function onAccountChange(account)
   if type(account) ~= "table" then return end
-  launcher.view("accountPickerLabel"):setText(account.name or "未登录")
+  launcher.view("accountName"):setText(account.name or "未登录")
 end
 
 -- 真下载进度推流（download.start 后由引擎每 0.3s 上报）：更新进度条与文本。
@@ -1167,31 +1349,113 @@ function onRemoteVersions(payload)
   refreshDownloadVersions()
 end
 
+local function refreshSettingsSidebar()
+  for _, s in ipairs(launcher.state and launcher.state.settings or {}) do
+    local token = s.action and s.action:match("open_subpage:(.+)")
+    if token then
+      local sel = (token == setSelCat)
+      launcher.view("setCat_" .. token):setStyle(sel
+        and { background = C.hover }
+        or  { background = C.card })
+    end
+  end
+end
+
+local function refreshVersionSettingsSidebar()
+  for _, c in ipairs(VS_CATS) do
+    local sel = (c.token == vsSelCat)
+    launcher.view("vsCat_" .. c.token):setStyle(sel
+      and { background = C.hover }
+      or  { background = C.card })
+  end
+end
+
+local function refreshVersionSettingsContent()
+  for _, c in ipairs(VS_CATS) do
+    local v = launcher.view("vsSec_" .. c.token)
+    if v then v:setVisible(c.token == vsSelCat) end
+  end
+end
+
+local function refreshVersionSettingsValues()
+  local ver = launcher.state and launcher.state.version
+  local name = (ver and ver.name) or "未选择版本"
+  if launcher.view("vsName") then launcher.view("vsName"):setText(name) end
+  if launcher.view("vsMeta") then
+    launcher.view("vsMeta"):setText("版本信息 · " ..
+      (name == "未选择版本" and "请先在版本选择中指定" or "本地版本"))
+  end
+  local resp = launcher.service and launcher.service("versionSettings", "list", {}) or nil
+  if type(resp) == "table" and resp.ok and type(resp.items) == "table" then
+    for _, it in ipairs(resp.items) do
+      local k = it.key
+      local v = launcher.view("vsSet_" .. k .. "Val")
+      if v then v:setText(tostring(it.value or "···")) end
+    end
+  end
+end
+
+local function refreshMoreSidebar()
+  for _, g in ipairs(CONFIG.moreGroups) do
+    local sel = (g.name == moreSelCat)
+    launcher.view("moreCat_" .. g.name):setStyle(sel
+      and { background = C.hover }
+      or  { background = C.card })
+  end
+end
+
+local function refreshMoreContent()
+  for _, g in ipairs(CONFIG.moreGroups) do
+    local v = launcher.view("moreSec_" .. g.name)
+    if v then v:setVisible(g.name == moreSelCat) end
+  end
+end
+
 function onPageChange(page)
   currentPage = page
-  -- 全幅无左栏页：版本设置 / 版本管理 / 账号管理 / 游戏目录 / 任意设置子页（顶栏仍显示，仅收左栏）
-  local isFull = (page == "version_settings") or (page == "versionManager")
-    or (page == "accountManager") or (page == "gameDirectory") or (page == "versionDetail")
-    or (CONFIG.settingsSubpages[page] ~= nil)
+  -- 全幅无左栏页：版本管理 / 账号管理 / 游戏目录 / 版本详情（二级页，使用目录侧栏）
+  local isDirFull = (page == "versionManager") or (page == "accountManager")
+    or (page == "gameDirectory") or (page == "versionDetail")
+  local isSettingsSub = (CONFIG.settingsSubpages[page] ~= nil)
+  local isSettings = (page == "settings") or isSettingsSub
+  local isVersionSettings = (page == "version_settings")
+  local isMore = (page == "more")
+
   launcher.view("titlebar"):setVisible(true)
-  launcher.view("left"):setVisible(not isFull)
+  launcher.view("left"):setVisible(true)
   launcher.view("leftHome"):setVisible(page == "home")
-  launcher.view("leftDownload"):setVisible(page == "download" and not isFull)
-  launcher.view("leftDir"):setVisible(page ~= "home" and page ~= "download" and not isFull)
-  if page == "download" and not isFull then
+  launcher.view("leftDownload"):setVisible(page == "download")
+  launcher.view("leftDir"):setVisible(isDirFull)
+  launcher.view("leftSettings"):setVisible(isSettings)
+  launcher.view("leftVersionSettings"):setVisible(isVersionSettings)
+  launcher.view("leftMore"):setVisible(isMore)
+
+  if page == "download" then
     refreshDownloadSidebar()
     refreshDownloadVersions()
+    refreshDownloadGroupVisibility()
     for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
-  elseif page ~= "home" and page ~= "download" and not isFull then
+  elseif isSettings then
+    refreshSettingsSidebar()
+    -- 若进入设置子页，同步左侧高亮
+    if isSettingsSub then setSelCat = page end
+    refreshSettingsSidebar()
+  elseif isVersionSettings then
+    refreshVersionSettingsSidebar()
+    refreshVersionSettingsContent()
+    refreshVersionSettingsValues()
+  elseif isMore then
+    refreshMoreSidebar()
+    refreshMoreContent()
+  elseif isDirFull then
     refreshDirectorySidebar()
   end
-  if isFull then
-    if CONFIG.settingsSubpages[page] then
-      selectTab("tab.setup") -- 设置子页仍高亮「设置」页签
-    elseif page == "versionDetail" then
-      selectTab("tab.download") -- 版本详情页仍高亮「下载」页签
-    end
-  elseif not isFull then
+
+  if isSettingsSub then
+    selectTab("tab.setup")
+  elseif page == "versionDetail" then
+    selectTab("tab.download")
+  else
     local tabId = PAGE_TAB[page]
     if tabId then selectTab(tabId) end
   end
@@ -1213,8 +1477,9 @@ function onClick(id)
   for _, t in ipairs(TABS) do
     if t.id == id then selectTab(t.id) return end
   end
-  if id == "cap.offline" then selectCap(1) return end
-  if id == "cap.genuine" then selectCap(2) return end
+  if id == "cap.mojang" then selectCap(1) return end
+  if id == "cap.microsoft" then selectCap(2) return end
+  if id == "cap.offline" then selectCap(3) return end
   if id == "dlStart" then
     launcher.view("dlProgress"):setVisible(true)
     launcher.view("dlProgressLabel"):setText("准备中…")
@@ -1261,6 +1526,40 @@ function onClick(id)
     launcher.view("dlTitle"):setText(CONFIG.download.titleByCat[dlSelCat] or "")
     return
   end
+  local dlg = id:match("^dlgHeader:(%w+)$")
+  if dlg then
+    dlExpanded[dlg] = not (dlExpanded[dlg] == true)
+    refreshDownloadGroupVisibility()
+    return
+  end
+  local dlp = id:match("^dlPopular:(%d+)$")
+  if dlp then
+    -- 社区资源热门项占位：切换至对应分类并提示
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("社区资源下载功能开发中…")
+    return
+  end
+  local sc = id:match("^setCat:(.+)$")
+  if sc then
+    setSelCat = sc
+    refreshSettingsSidebar()
+    launcher.action("open_subpage:" .. sc)
+    return
+  end
+  local vsc = id:match("^vsCat:(.+)$")
+  if vsc then
+    vsSelCat = vsc
+    refreshVersionSettingsSidebar()
+    refreshVersionSettingsContent()
+    return
+  end
+  local mc = id:match("^moreCat:(.+)$")
+  if mc then
+    moreSelCat = mc
+    refreshMoreSidebar()
+    refreshMoreContent()
+    return
+  end
   local r, i = id:match("^segR(%d+)_(%d+)$")
   if r then selectSegment("segR", tonumber(r), tonumber(i)) return end
   local m = id:match("^segM_(%d+)$")
@@ -1289,6 +1588,52 @@ function onClick(id)
       launcher.service("gameDir", "new", { name = name })
       refreshGameDirectory()
     end
+    return
+  end
+  -- 设置子页条目点击（占位：可扩展为弹窗或二级页）
+  local subToken, subIdx = id:match("^subRow:([^:]+):(%d+_%d+)$")
+  if subToken then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("设置项 " .. subToken .. "/" .. subIdx .. " 待实现…")
+    return
+  end
+  -- 版本设置页动作
+  if id == "vsModInstall" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("Mod 加载器安装功能开发中…")
+    return
+  end
+  if id == "vsOpenDir" then
+    launcher.service("versionSettings", "openDir", {})
+    return
+  end
+  if id == "vsReset" then
+    launcher.service("versionSettings", "reset", {})
+    return
+  end
+  if id == "vsDelete" then
+    launcher.service("versionSettings", "delete", {})
+    return
+  end
+  if id == "vsResPack" or id == "vsShader" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText((id == "vsResPack" and "资源包" or "光影包") .. " 管理功能开发中…")
+    return
+  end
+  -- 概览页快捷按钮（开发中占位）
+  if id == "vsRename" or id == "vsDesc" or id == "vsFav" or id == "vsExport" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("功能开发中：" .. id)
+    return
+  end
+  if id == "vsOpenSaves" or id == "vsOpenMods" or id == "vsModInstallFile" or id == "vsModDownload" or id == "vsModSelectAll" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("功能开发中：" .. id)
+    return
+  end
+  if id == "vsComplete" then
+    launcher.view("dlProgress"):setVisible(true)
+    launcher.view("dlProgressLabel"):setText("补全文件功能开发中…")
     return
   end
 end
