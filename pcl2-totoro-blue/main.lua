@@ -1,4 +1,4 @@
--- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.13.2
+-- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.13.3
 --
 -- 契约（引擎通用，零特例）：
 --   主题：仿 PCL 浅色——蓝顶栏 topbar #0A5FC4、内容区浅蓝灰对角渐变
@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.13.2" }
+  return { name = "PCL 浅色", version = "1.13.3" }
 end
 
 local C = {
@@ -123,11 +123,7 @@ local CONFIG = {
   },
   online = {
     branch = { "局域网", "在线" },
-    rooms = {
-      { name = "联机大厅 · 生存", status = "房主 · 24ms" },
-      { name = "光影测试房间",   status = "房主 · 68ms" },
-      { name = "速通挑战房间",   status = "房主 · 96ms" },
-    },
+    rooms = {}, -- 房间列表由 MultiplayerManager 在运行时填充
   },
   moreGroups = {
     { name = "启动", rows = {
@@ -599,48 +595,61 @@ local function buildDownloadPage()
     padding = "2.5vh", spacing = "2vh", children = kids }
 end
 
--- ============ 联机页（两分支 + 输入条 + 提示行 + 房间条目卡）============
+-- ============ 联机页（两分支 + 加入/创建行 + 状态行 + 房间条目卡）============
+local MP_MAX_ROOMS = 6
+
+local function mpRoomSlot(i)
+  return ui.row { id = "mpRoom_" .. i, height = "7vh", background = C.card,
+    border = BORDER, corner = "1.2vh", hoverColor = C.hover, crossAlign = "center", spacing = "1.5vh",
+    padding = "1.5vh", visible = false,
+    children = {
+      ui.image { icon = "sf:square.3.layers.3d", size = "5vh", corner = "1vh", background = C.accent,
+        style = { tint = C.white } },
+      ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+        ui.text { id = "mpRoom_" .. i .. "_name", text = "", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+        ui.text { id = "mpRoom_" .. i .. "_status", text = "", style = { font = "2vh", color = C.mid } },
+      } },
+      ui.text { id = "mpRoom_" .. i .. "_action", text = "连接", style = { font = "2.2vh", color = C.accent } },
+    } }
+end
+
 local function buildMultiPage()
-  local rooms = {}
-  for i, r in ipairs(CONFIG.online.rooms) do
-    rooms[#rooms + 1] = ui.row { id = "mpRoom" .. i, height = "7vh", background = C.card,
-      border = BORDER, corner = "1.2vh", hoverColor = C.hover, crossAlign = "center", spacing = "1.5vh",
-      padding = "1.5vh",
-      children = {
-        ui.image { icon = "sf:square.3.layers.3d", size = "5vh", corner = "1vh", background = C.accent,
-          style = { tint = C.white } },
-        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
-          ui.text { text = r.name, style = { font = "2.4vh", weight = "bold", color = C.dark } },
-          ui.text { text = r.status, style = { font = "2vh", color = C.mid } },
-        } },
-        ui.text { text = "加入", style = { font = "2.2vh", color = C.accent } },
-      } }
-  end
+  local slots = {}
+  for i = 1, MP_MAX_ROOMS do slots[#slots + 1] = mpRoomSlot(i) end
   return ui.column { id = "pageMulti", weight = 1, crossAlign = "center",
     padding = "2.5vh", spacing = "2.5vh",
     children = {
       segmentRow("segM", CONFIG.online.branch, "1vh"),
-      -- 输入条
-      ui.row { width = "94%", height = "5.5vh", background = C.card, border = BORDER,
-        corner = "1.2vh", crossAlign = "center", padding = "1.5vh", spacing = "1.2vh",
+      -- 加入行
+      ui.row { id = "mpJoinRow", width = "94%", height = "5.5vh", background = C.card, border = BORDER,
+        corner = "1.2vh", crossAlign = "center", padding = "1.5vh", spacing = "1.2vh", hoverColor = C.hover,
         children = {
           ui.image { icon = "sf:link", size = "2.6vh", style = { tint = C.mid } },
-          ui.text { weight = 1, text = "输入房间连接码或地址…", style = { font = "2.2vh", color = C.mid } },
+          ui.text { weight = 1, text = "输入房间连接码加入房间…", style = { font = "2.2vh", color = C.mid } },
           ui.button { id = "mpJoin", label = "加入", height = "4vh", background = C.accent,
             corner = "pill", style = { font = "2.2vh", tint = C.white } },
         } },
-      -- 提示行
-      ui.row { width = "94%", background = C.hintBg, corner = "1vh", crossAlign = "center",
+      -- 创建行
+      ui.row { id = "mpCreateRow", width = "94%", height = "5.5vh", background = C.card, border = BORDER,
+        corner = "1.2vh", crossAlign = "center", padding = "1.5vh", spacing = "1.2vh", hoverColor = C.hover,
+        children = {
+          ui.image { icon = "sf:plus.circle", size = "2.6vh", style = { tint = C.mid } },
+          ui.text { weight = 1, text = "输入 Network ID 创建房间…", style = { font = "2.2vh", color = C.mid } },
+          ui.button { id = "mpCreate", label = "创建", height = "4vh", background = C.accent,
+            corner = "pill", style = { font = "2.2vh", tint = C.white } },
+        } },
+      -- 状态行
+      ui.row { id = "mpStatusRow", width = "94%", background = C.hintBg, corner = "1vh", crossAlign = "center",
         spacing = "1.2vh", padding = "1.5vh",
         children = {
-          ui.text { text = "ⓘ", style = { font = "2.8vh", color = C.accent } },
-          ui.text { weight = 1, text = "联机需要双方都能访问服务器，房间连接码用于分享。",
+          ui.text { id = "mpStatusIcon", text = "ⓘ", style = { font = "2.8vh", color = C.accent } },
+          ui.text { id = "mpStatus", weight = 1, text = "联机需要双方都能访问服务器，房间连接码用于分享。",
             style = { font = "2.2vh", color = C.dark } },
         } },
       -- 房间条目卡
       card("mpRoomCard", (function()
         local k = { ui.text { text = "在线房间", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-        pushAll(k, rooms)
+        pushAll(k, slots)
         return k
       end)()),
     } }
@@ -1109,6 +1118,31 @@ local function refreshDirectorySidebar()
   launcher.view("dirEmpty"):setVisible(count == 0)
 end
 
+local function refreshMultiRooms()
+  local resp = launcher.service and launcher.service("multiplayer", "list", {}) or nil
+  local items = (type(resp) == "table" and resp.ok and type(resp.items) == "table") and resp.items or {}
+  for i = 1, MP_MAX_ROOMS do
+    local it = items[i]
+    local row = launcher.view("mpRoom_" .. i)
+    if row then
+      if it then
+        row:setVisible(true)
+        local name = it.name or ("房间 " .. i)
+        local status = it.status or "未连接"
+        if it.hostIP and it.hostIP ~= "" then
+          status = status .. " · " .. it.hostIP .. ":" .. (it.hostPort or "25565")
+        end
+        launcher.view("mpRoom_" .. i .. "_name"):setText(name)
+        launcher.view("mpRoom_" .. i .. "_status"):setText(status)
+        local actionText = (it.isCurrent == true) and "断开" or "连接"
+        launcher.view("mpRoom_" .. i .. "_action"):setText(actionText)
+      else
+        row:setVisible(false)
+      end
+    end
+  end
+end
+
 -- 通用侧边栏条目：左图标 + 标题，可选选中指示（圆点）
 local function sidebarItem(id, icon, label, action, dotId)
   return ui.row {
@@ -1334,6 +1368,22 @@ function onAccountChange(account)
   launcher.view("accountName"):setText(account.name or "未登录")
 end
 
+-- 联机房间列表/状态刷新
+function onMultiplayerRooms(payload)
+  refreshMultiRooms()
+end
+
+function onMultiplayerStatus(payload)
+  local msg = (type(payload) == "table" and payload.message) or "联机状态已更新"
+  if launcher.view("mpStatus") then launcher.view("mpStatus"):setText(msg) end
+  refreshMultiRooms()
+end
+
+function onMultiplayerProgress(payload)
+  local msg = (type(payload) == "table" and payload.message) or "连接中…"
+  if launcher.view("mpStatus") then launcher.view("mpStatus"):setText(msg) end
+end
+
 -- 真下载进度推流（download.start 后由引擎每 0.3s 上报）：更新进度条与文本。
 function onDownloadUpdate(payload)
   local p = payload or {}
@@ -1420,12 +1470,13 @@ function onPageChange(page)
   local isSettings = (page == "settings") or isSettingsSub
   local isVersionSettings = (page == "version_settings")
   local isMore = (page == "more")
+  local isMulti = (page == "multi")
 
   launcher.view("titlebar"):setVisible(true)
   launcher.view("left"):setVisible(true)
   launcher.view("leftHome"):setVisible(page == "home")
   launcher.view("leftDownload"):setVisible(page == "download")
-  launcher.view("leftDir"):setVisible(isDirFull)
+  launcher.view("leftDir"):setVisible(isDirFull or isMulti)
   launcher.view("leftSettings"):setVisible(isSettings)
   launcher.view("leftVersionSettings"):setVisible(isVersionSettings)
   launcher.view("leftMore"):setVisible(isMore)
@@ -1447,8 +1498,9 @@ function onPageChange(page)
   elseif isMore then
     refreshMoreSidebar()
     refreshMoreContent()
-  elseif isDirFull then
+  elseif isDirFull or isMulti then
     refreshDirectorySidebar()
+    if isMulti then refreshMultiRooms() end
   end
 
   if isSettingsSub then
@@ -1588,6 +1640,20 @@ function onClick(id)
       launcher.service("gameDir", "new", { name = name })
       refreshGameDirectory()
     end
+    return
+  end
+  -- 联机页：加入 / 创建 / 连接房间槽位
+  if id == "mpJoin" or id == "mpJoinRow" then
+    launcher.service("multiplayer", "promptJoin", {})
+    return
+  end
+  if id == "mpCreate" or id == "mpCreateRow" then
+    launcher.service("multiplayer", "promptCreate", {})
+    return
+  end
+  local mpIdx = id:match("^mpRoom_(%d+)$")
+  if mpIdx then
+    launcher.service("multiplayer", "connect", { index = tonumber(mpIdx) })
     return
   end
   -- 设置子页条目点击（占位：可扩展为弹窗或二级页）
