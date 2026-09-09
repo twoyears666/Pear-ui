@@ -3,7 +3,7 @@
   "id": "pcl2-totoro-blue",
   "name": "PCL 浅色",
   "author": "Pear",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "entry": "main.lua",
   "colors": "colors.json"
 }

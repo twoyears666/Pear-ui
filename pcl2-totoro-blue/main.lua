@@ -1,4 +1,4 @@
--- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.13.0
+-- Pear 启动器 · 仿 PCL 浅色 UI 包 —— v1.13.2
 --
 -- 契约（引擎通用，零特例）：
 --   主题：仿 PCL 浅色——蓝顶栏 topbar #0A5FC4、内容区浅蓝灰对角渐变
@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.13.1" }
+  return { name = "PCL 浅色", version = "1.13.2" }
 end
 
 local C = {
@@ -45,10 +45,10 @@ local C = {
   fieldBorder = "$color:fieldBorder",
 }
 
-local BORDER   = { width = 1, color = C.cardBorder }
-local BORDER_A = { width = 1.5, color = C.accentBorder }
-local BORDER_D = { width = 1.5, color = C.danger }
-local SHADOW   = { blur = 4, opacity = 0.07, x = 0, y = 1 }
+local BORDER   = { width = "0.12vh", color = C.cardBorder }
+local BORDER_A = { width = "0.18vh", color = C.accentBorder }
+local BORDER_D = { width = "0.18vh", color = C.danger }
+local SHADOW   = { blur = "0.3vh", opacity = 0.07, x = 0, y = "0.15vh" }
 
 local TABS = {
   { id = "tab.home",     label = "启动", icon = "sf:house.fill",                             action = "open:home",       page = "home" },
@@ -302,7 +302,7 @@ local function pickerRow(id, label, valueText, valueId)
       ui.text { text = label, style = { font = "2.4vh", color = C.dark } },
       ui.spacer { weight = 1 },
       ui.row { weight = 3, width = "70%", height = "4.5vh", background = C.card,
-        border = { width = 1, color = C.fieldBorder }, corner = "0.8vh", crossAlign = "center",
+        border = { width = "0.12vh", color = C.fieldBorder }, corner = "0.8vh", crossAlign = "center",
         padding = { left = "1.2vh", right = "1.2vh" },
         children = {
           ui.text { id = valueId, text = valueText, weight = 1, style = { font = "2.2vh", color = C.dark } },
