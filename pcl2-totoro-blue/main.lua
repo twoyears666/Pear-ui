@@ -104,6 +104,11 @@ local CONFIG = {
         meta = "提升帧率与游戏体验的核心模组", right = "更新 …   下载 …" },
     },
     searchLabels = { "搜索源", "搜索对象", "搜索关键词" },
+    searchSources = { { id = "modrinth", name = "Modrinth" }, { id = "curseforge", name = "CurseForge" } },
+    searchObjects = { "mod", "modpack", "datapack", "resourcepack", "shader" },
+    communityResultSlots = 6, -- 社区资源搜索结果槽位数（下载页一次展示的最大结果数）
+    keywordPlaceholder = "点击输入关键词…",
+    searchStatusPreset = "点击「搜索」获取社区资源，点击结果条目可下载最新版本",
     vanillaTypes = { "最新版本", "正式版", "快照" },
     installHint = "安装后请留意版本与 Mod 兼容性；Fabric/Forge 需安装对应加载器。",
     defaultVersion = "1.20.1", -- 下载页「开始下载」默认安装的版本 id（可改；接版本清单后可动态选）
@@ -544,53 +549,65 @@ local function buildDownloadPage()
         } }
       return cards
     end)() }
-  local dlSearch = {}
-  for i, lab in ipairs(CONFIG.download.searchLabels) do
-    dlSearch[#dlSearch + 1] = pickerRow("dlSearchRow" .. i, lab, "…")
+  -- 社区资源：搜索 + 结果列表（随 dlSelCat 切换分类，单一结构避免节点 id 冲突）
+  local function commPickerRow(id, label, valueId, action)
+    return ui.row {
+      id = id, height = "4.5vh", width = "100%", crossAlign = "center", hoverColor = C.hover, action = action,
+      children = {
+        ui.text { text = label, style = { font = "2.4vh", color = C.dark } },
+        ui.spacer { weight = 1 },
+        ui.row { weight = 3, width = "70%", height = "4.5vh", background = C.card,
+          border = { width = "0.12vh", color = C.fieldBorder }, corner = "0.8vh", crossAlign = "center",
+          padding = { left = "1.2vh", right = "1.2vh" },
+          children = {
+            ui.text { id = valueId, text = "…", weight = 1, style = { font = "2.2vh", color = C.dark } },
+            ui.text { text = " ▾", style = { font = "2.2vh", color = C.mid } },
+          } },
+      } }
   end
-  local dlRes = {}
-  for i, it in ipairs(CONFIG.download.popular) do
-    dlRes[#dlRes + 1] = bigItem("dl4_" .. i, it.icon, it.tint, it.title, it.meta, it.right, "dlPopular:" .. i)
+  local commSlots = {}
+  for i = 1, CONFIG.download.communityResultSlots do
+    commSlots[#commSlots + 1] = ui.row {
+      id = "dlComm_" .. i, height = "9vh", background = C.card, corner = "1.1vh",
+      border = BORDER, hoverColor = C.hover, crossAlign = "center", spacing = "1.5vh",
+      padding = "1.5vh", visible = false, action = "dlComm:" .. i,
+      children = {
+        ui.image { icon = "sf:cube.fill", size = "6vh", corner = "pill", background = C.accent,
+          style = { tint = C.white } },
+        ui.column { weight = 1, justify = "center", spacing = "0.5vh", children = {
+          ui.text { id = "dlComm_" .. i .. "_title", text = "", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+          ui.text { id = "dlComm_" .. i .. "_meta", text = "", style = { font = "2vh", color = C.mid } },
+        } },
+        ui.text { id = "dlComm_" .. i .. "_btn", text = "下载", style = { font = "2.2vh", color = C.accent } },
+      } }
   end
+  local searchCard = card("dlSearchCard", { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+    commPickerRow("dlSrcRow", "搜索源", "dlSrcVal", "dlPick:source"),
+    commPickerRow("dlObjRow", "搜索对象", "dlObjVal", nil),
+    commPickerRow("dlKwRow", "搜索关键词", "dlKwVal", "dlPick:keyword"),
+    ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
+      children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } } })
+  local resultCards = { ui.text { text = "结果", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
+  pushAll(resultCards, commSlots)
+  resultCards[#resultCards + 1] = ui.text { id = "dlCommStatus", text = CONFIG.download.searchStatusPreset, width = "100%",
+    style = { font = "2.2vh", color = C.mid } }
+  resultCards[#resultCards + 1] = ui.column { id = "dlCommBarBox", width = "100%", visible = false,
+    spacing = "1vh", crossAlign = "stretch",
+    children = {
+      ui.row { height = "1.6vh", background = C.faintBlue, corner = "pill", overflow = "hidden",
+        children = { ui.column { id = "dlCommBarFill", width = "0%", height = "100%",
+          background = { from = C.accent, to = C.cyan, angle = 0 } } } },
+      ui.text { id = "dlCommBarLabel", text = "", width = "100%", style = { font = "2.2vh", color = C.dark } },
+    } }
   local kids = {
     ui.text { id = "dlTitle", text = CONFIG.download.titleByCat[dlSelCat] or "原版游戏", width = "100%",
       style = { font = "3vh", weight = "bold", color = C.dark } },
     -- 分类1：原版游戏 → 最新版本
     ui.column { id = "dlSec_1", width = "100%", crossAlign = "center", spacing = "2vh", children = { sec1 } },
-    -- 分类2..6：社区资源 → 搜索 + 结果列表（同一结构，标题区分）
-    ui.column { id = "dlSec_2", width = "100%", crossAlign = "center", spacing = "2vh", visible = false, children = {
-      card("dlSearchCard", (function()
-        local s = { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-        pushAll(s, dlSearch)
-        s[#s + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
-          children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } }
-        return s
-      end)()),
-      card("dlResultCard", (function()
-        local s = { ui.text { text = "结果", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-        pushAll(s, dlRes)
-        return s
-      end)()),
-    } },
+    -- 分类2..6：社区资源 → 搜索 + 结果列表（随 dlSelCat 切换分类）
+    ui.column { id = "dlSecC", width = "100%", crossAlign = "center", spacing = "2vh", visible = false,
+      children = { searchCard, card("dlResultCardC", resultCards) } },
   }
-  for c = 3, 6 do
-    kids[#kids + 1] = ui.column { id = "dlSec_" .. c, width = "100%", crossAlign = "center",
-      spacing = "2vh", visible = false,
-      children = {
-        card("dlSearchCard" .. c, (function()
-          local s = { ui.text { text = "搜索", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-          pushAll(s, dlSearch)
-          s[#s + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "3vh",
-            children = { plainButton("dlBtnSearch", "搜索", false), plainButton("dlBtnReset", "重置", false) } }
-          return s
-        end)()),
-        card("dlResultCard" .. c, (function()
-          local s = { ui.text { text = "结果", style = { font = "2.8vh", weight = "bold", color = C.dark } } }
-          pushAll(s, dlRes)
-          return s
-        end)()),
-      } }
-  end
   return ui.column { id = "pageDownload", weight = 1, crossAlign = "center",
     padding = "2.5vh", spacing = "2vh", children = kids }
 end
@@ -1221,6 +1238,101 @@ local function refreshDownloadSidebar()
   end
 end
 
+-- ============ 社区资源（下载页）搜索与下载 ============
+local dlSource = 1        -- 搜索源索引（CONFIG.download.searchSources）
+local dlKeyword = ""      -- 当前搜索关键词
+local dlCommItems = {}    -- 最近一次结果缓存（槽位索引 → 条目）供点击下载使用
+local commDownloading = false
+
+local function commCategory()
+  return CONFIG.download.searchObjects[dlSelCat - 1] or "mod"
+end
+
+local function commSource()
+  return CONFIG.download.searchSources[dlSource] or CONFIG.download.searchSources[1]
+end
+
+local function clearCommunityResults()
+  for i = 1, CONFIG.download.communityResultSlots do
+    launcher.view("dlComm_" .. i):setVisible(false)
+  end
+  dlCommItems = {}
+end
+
+local function refreshCommunitySearch()
+  launcher.view("dlSrcVal"):setText(commSource().name or "…")
+  launcher.view("dlObjVal"):setText(CONFIG.download.titleByCat[dlSelCat] or "…")
+  launcher.view("dlKwVal"):setText((dlKeyword ~= "" and dlKeyword) or CONFIG.download.keywordPlaceholder)
+  clearCommunityResults()
+  launcher.view("dlCommStatus"):setText(CONFIG.download.searchStatusPreset)
+  launcher.view("dlCommBarBox"):setVisible(false)
+  commDownloading = false
+end
+
+local function doCommunitySearch()
+  if dlSelCat <= 1 then return end
+  local kw = tostring(dlKeyword):gsub("^%s+", ""):gsub("%s+$", "")
+  if kw == "" then
+    launcher.view("dlCommStatus"):setText("请先点击「搜索关键词」输入要搜索的内容")
+    return
+  end
+  launcher.service("community", "search", {
+    source = commSource().id, category = commCategory(),
+    keyword = kw, limit = CONFIG.download.communityResultSlots,
+  })
+  launcher.view("dlCommStatus"):setText("正在搜索「" .. kw .. "」…")
+end
+
+-- 事件：搜索完成，填充结果槽位
+function onCommunityResults(payload)
+  local items = (type(payload) == "table" and type(payload.items) == "table") and payload.items or {}
+  for i = 1, CONFIG.download.communityResultSlots do
+    local it = items[i]
+    local row = launcher.view("dlComm_" .. i)
+    if row then
+      row:setVisible(it ~= nil)
+      if it then
+        launcher.view("dlComm_" .. i .. "_title"):setText(it.title or "未知资源")
+        local author = it.author or ""
+        launcher.view("dlComm_" .. i .. "_meta"):setText((author ~= "") and (author .. " · 下载 " .. tostring(it.downloads or 0)) or ("下载 " .. tostring(it.downloads or 0)))
+      end
+    end
+  end
+  dlCommItems = items
+  launcher.view("dlCommStatus"):setText(#items == 0
+    and "未找到结果，换个关键词试试"
+    or ("共 " .. #items .. " 条结果，点击条目下载最新版本"))
+end
+
+-- 事件：下载/搜索进度或状态提示
+function onCommunityStatus(payload)
+  local msg = (type(payload) == "table" and payload.message) or ""
+  if msg == "" then return end
+  if launcher.view("dlCommStatus") then launcher.view("dlCommStatus"):setText(msg) end
+  if msg:find("已下载", 1, true) or msg:find("完成", 1, true) then
+    launcher.view("dlCommBarBox"):setVisible(false)
+    commDownloading = false
+  end
+end
+
+-- 事件：下载进度推流，更新进度条与文本
+function onCommunityProgress(payload)
+  local p = (type(payload) == "table" and payload.items and payload.items[1]) or {}
+  local done = p.downloaded or 0
+  local total = p.total or 100
+  local pct = (total > 0) and math.floor(done / total * 100) or 0
+  launcher.view("dlCommBarBox"):setVisible(true)
+  launcher.view("dlCommBarFill"):setStyle({ width = pct .. "%" })
+  launcher.view("dlCommBarLabel"):setText(p.finished and "下载完成" or ("下载中 " .. pct .. "%…"))
+end
+
+-- 事件：关键词输入弹窗返回
+function onCommunityKeyword(payload)
+  local items = (type(payload) == "table" and type(payload.items) == "table") and payload.items or {}
+  dlKeyword = (items[1] ~= nil) and items[1] or ""
+  launcher.view("dlKwVal"):setText((dlKeyword ~= "" and dlKeyword) or CONFIG.download.keywordPlaceholder)
+end
+
 function build(ui)
   local homeSidebar = buildHomeSidebar()
   local pageHome = buildHomePage()
@@ -1485,7 +1597,9 @@ function onPageChange(page)
     refreshDownloadSidebar()
     refreshDownloadVersions()
     refreshDownloadGroupVisibility()
-    for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
+    launcher.view("dlSec_1"):setVisible(dlSelCat == 1)
+    launcher.view("dlSecC"):setVisible(dlSelCat > 1)
+    if dlSelCat > 1 then refreshCommunitySearch() end
   elseif isSettings then
     refreshSettingsSidebar()
     -- 若进入设置子页，同步左侧高亮
@@ -1574,7 +1688,9 @@ function onClick(id)
   if dlc then
     dlSelCat = tonumber(dlc) or 1
     refreshDownloadSidebar()
-    for i = 1, #CONFIG.download.titleByCat do launcher.view("dlSec_" .. i):setVisible(i == dlSelCat) end
+    launcher.view("dlSec_1"):setVisible(dlSelCat == 1)
+    launcher.view("dlSecC"):setVisible(dlSelCat > 1)
+    if dlSelCat > 1 then refreshCommunitySearch() end
     launcher.view("dlTitle"):setText(CONFIG.download.titleByCat[dlSelCat] or "")
     return
   end
@@ -1584,11 +1700,41 @@ function onClick(id)
     refreshDownloadGroupVisibility()
     return
   end
-  local dlp = id:match("^dlPopular:(%d+)$")
-  if dlp then
-    -- 社区资源热门项占位：切换至对应分类并提示
-    launcher.view("dlProgress"):setVisible(true)
-    launcher.view("dlProgressLabel"):setText("社区资源下载功能开发中…")
+  -- 社区资源：搜索源切换 / 关键词输入 / 搜索 / 重置 / 点击结果下载
+  if id == "dlPick:source" then
+    dlSource = (dlSource % #CONFIG.download.searchSources) + 1
+    launcher.view("dlSrcVal"):setText(commSource().name or "…")
+    clearCommunityResults()
+    launcher.view("dlCommStatus"):setText(CONFIG.download.searchStatusPreset)
+    return
+  end
+  if id == "dlPick:keyword" then
+    launcher.service("community", "promptKeyword", { category = commCategory() })
+    return
+  end
+  if id == "dlBtnSearch" then doCommunitySearch() return end
+  if id == "dlBtnReset" then
+    dlKeyword = ""
+    if launcher.view("dlKwVal") then launcher.view("dlKwVal"):setText(CONFIG.download.keywordPlaceholder) end
+    clearCommunityResults()
+    launcher.view("dlCommStatus"):setText(CONFIG.download.searchStatusPreset)
+    launcher.view("dlCommBarBox"):setVisible(false)
+    return
+  end
+  local ci = id:match("^dlComm:(%d+)$")
+  if ci then
+    local it = dlCommItems[tonumber(ci)]
+    if it and not commDownloading then
+      commDownloading = true
+      launcher.view("dlCommBarBox"):setVisible(true)
+      launcher.view("dlCommBarFill"):setStyle({ width = "0%" })
+      launcher.view("dlCommBarLabel"):setText("准备下载…")
+      launcher.view("dlCommStatus"):setText("准备下载「" .. (it.title or "") .. "」最新版本…")
+      launcher.service("community", "download", {
+        source = commSource().id, category = commCategory(),
+        projectId = it.id, title = it.title,
+      })
+    end
     return
   end
   local sc = id:match("^setCat:(.+)$")
