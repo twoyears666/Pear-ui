@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.14.1" }
+  return { name = "PCL 浅色", version = "1.14.2" }
 end
 
 local C = {
@@ -810,6 +810,31 @@ end
 -- ============ 更多页（左侧分类 + 右侧分组卡片，仿 PCL 更多页）============
 local function buildMorePage()
   local kids = {}
+  -- 主题包（Material Pack）信息卡：名称 + 当前加载版本（版本动态填充，不硬编码）
+  kids[#kids + 1] = ui.column { id = "moreSec_theme", width = "94%", spacing = "1.2vh",
+    crossAlign = "stretch",
+    children = {
+      ui.text { text = "主题包", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+      ui.column { background = C.card, border = BORDER, corner = "1.2vh", shadow = SHADOW,
+        padding = "1vh", spacing = "0.5vh",
+        children = {
+          ui.row { id = "moreThemeName", height = "6.5vh", crossAlign = "center",
+            spacing = "1.6vh", padding = "1.8vh",
+            children = {
+              ui.image { icon = "sf:paintbrush.fill", size = "4.5vh", corner = "pill",
+                background = C.faintBlue, style = { tint = C.accent } },
+              ui.text { text = "主题包名称", weight = 1, style = { font = "2.6vh", color = C.dark } },
+              ui.text { text = "PCL 浅色", style = { font = "2.5vh", color = C.mid } },
+            } },
+          ui.row { id = "moreThemeVer", height = "6.5vh", crossAlign = "center",
+            spacing = "1.6vh", padding = "1.8vh",
+            children = {
+              ui.image { icon = "sf:tag.fill", size = "4.5vh", corner = "pill",
+                background = C.faintBlue, style = { tint = C.accent } },
+              ui.text { text = "主题包版本", weight = 1, style = { font = "2.6vh", color = C.dark } },
+              ui.text { id = "moreThemeVersion", text = "· · ·", style = { font = "2.5vh", color = C.mid } },
+            } },
+        } } }
   for _, g in ipairs(CONFIG.moreGroups) do
     local rows = {}
     for _, rr in ipairs(g.rows) do
