@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.14.2" }
+  return { name = "PCL 浅色", version = "1.14.3" }
 end
 
 local C = {
@@ -834,7 +834,7 @@ local function buildMorePage()
               ui.text { text = "主题包版本", weight = 1, style = { font = "2.6vh", color = C.dark } },
               ui.text { id = "moreThemeVersion", text = "· · ·", style = { font = "2.5vh", color = C.mid } },
             } },
-        } } }
+        } } } }
   for _, g in ipairs(CONFIG.moreGroups) do
     local rows = {}
     for _, rr in ipairs(g.rows) do
