@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.13.3" }
+  return { name = "PCL 浅色", version = "1.14.0" }
 end
 
 local C = {
@@ -216,6 +216,52 @@ local CONFIG = {
       } },
     } },
   },
+  -- 设置页数据源（数据驱动）：左侧目录 + 右侧单一大白卡分组条目。
+  -- 每项 type：toggle=开关 / select=取值行 / button=描边蓝字按钮 / text=仅展示。
+  -- settingsGroups 恒非常规非空渲染，侧栏与内容都不依赖引擎运行时（M1/M4 根治）。
+  settingsGroups = {
+    { id = "launcher_settings", label = "启动器设置", icon = "sf:slider.horizontal.3", rows = {
+      { id = "st_theme",  label = "浅色主题",     type = "toggle", value = true  },
+      { id = "st_lang",   label = "界面语言",     type = "select", value = "简体中文" },
+      { id = "st_update", label = "自动检查更新", type = "toggle", value = true  },
+      { id = "st_mirror", label = "下载镜像",     type = "select", value = "自动检测" },
+    } },
+    { id = "download_mirror", label = "下载镜像", icon = "sf:arrow.down.circle.fill", rows = {
+      { id = "sd_source", label = "下载源",       type = "select", value = "Modrinth" },
+      { id = "sd_latency",label = "自动检测延迟", type = "toggle", value = false },
+      { id = "sd_multi",  label = "多线程下载",   type = "toggle", value = true  },
+    } },
+    { id = "video_settings", label = "视频设置", icon = "sf:display", rows = {
+      { id = "sv_res",   label = "最大分辨率",   type = "select", value = "自动" },
+      { id = "sv_vsync", label = "垂直同步",     type = "toggle", value = false },
+      { id = "sv_ratio", label = "渲染占比",     type = "select", value = "100%" },
+    } },
+    { id = "gl_renderer", label = "GL 渲染器", icon = "sf:memorychip.fill", rows = {
+      { id = "sg_layer", label = "OpenGL 兼容层", type = "select", value = "自动" },
+      { id = "sg_debug", label = "开启调试日志",  type = "toggle", value = false },
+      { id = "sg_reset", label = "重置渲染器设置", type = "button" },
+    } },
+    { id = "control_keys", label = "控制键", icon = "sf:keyboard.fill", rows = {
+      { id = "sk_layout", label = "按键布局",   type = "select", value = "默认" },
+      { id = "sk_joystick",label = "摇杆模式", type = "select", value = "跟随" },
+      { id = "sk_custom", label = "自定义按键", type = "button" },
+    } },
+    { id = "java_tuning", label = "Java 调整", icon = "sf:wrench.and.screwdriver.fill", rows = {
+      { id = "sj_ram",   label = "内存分配",  type = "select", value = "2048 MB" },
+      { id = "sj_jvm",   label = "JVM 参数",  type = "text",   value = "-Xmx2G" },
+      { id = "sj_reset", label = "重置 JVM 参数", type = "button" },
+    } },
+    { id = "ui_theme", label = "UI 设置", icon = "sf:paintbrush.fill", rows = {
+      { id = "su_scale",  label = "界面缩放",   type = "select", value = "自动" },
+      { id = "su_pack",   label = "主题材质包", type = "select", value = "PCL 浅色" },
+    } },
+    { id = "ai_assistant", label = "AI 助手", icon = "sf:sparkles", rows = {
+      { id = "sa_provider", label = "服务商",   type = "select", value = "未配置" },
+      { id = "sa_model",    label = "对话模型", type = "select", value = "默认" },
+    } },
+  },
+  settingsStatus = "设置项已按分组展示；点击开关或按钮可即时反馈（数据驱动配色，方便日后切换主题）。",
+  settingsGroupNames = { "常规", "网络", "显示", "兼容", "控制", "性能", "外观", "助手" },
 }
 
 -- 设置子页注册：token → 内容区 Lua 页子树 id（引擎经 open_subpage:token 切页）。
@@ -331,6 +377,55 @@ local function settingsRow(id, label, value, action)
     } }
 end
 
+-- 开关状态表（id → bool），默认取 CONFIG 定义（M5：点击真正切换）。
+local setToggles = {}
+local function toggleOn(id)
+  if setToggles[id] ~= nil then return setToggles[id] end
+  for _, g in ipairs(CONFIG.settingsGroups) do
+    for _, s in ipairs(g.rows or {}) do
+      if s.id == id then setToggles[id] = (s.value == true); return setToggles[id] end
+    end
+  end
+  return false
+end
+
+-- 设置项（数据驱动，type 字段决定控件形态；所有颜色走 C 变量）
+local function settingsItemRow(s)
+  local id = "setit_" .. s.id
+  if s.type == "toggle" then
+    local on = toggleOn(s.id)
+    return ui.row {
+      id = id, action = id, height = "6.5vh", width = "100%", crossAlign = "center",
+      spacing = "1.5vh", hoverColor = C.hover, padding = { left = "1.2vh", right = "1.2vh" },
+      children = {
+        ui.text { text = s.label, weight = 1, style = { font = "2.5vh", color = C.dark } },
+        ui.button { id = id .. "_sw", label = (on and "开" or "关"), width = "13vh", height = "4.4vh",
+          corner = "pill", action = id, hoverColor = C.hover,
+          style = { background = on and C.accent or C.cardBorder, tint = C.white,
+                    font = "2.2vh", weight = "bold" } },
+      } }
+  elseif s.type == "button" then
+    return ui.button { id = id, label = s.label, height = "5.6vh", width = "100%",
+      background = C.card, border = BORDER_A, corner = "0.7vh", action = id, hoverColor = C.hover,
+      style = { font = "2.4vh", tint = C.accent, weight = "bold" } }
+  elseif s.type == "text" then
+    return ui.row { id = id, height = "6.5vh", width = "100%", crossAlign = "center",
+      spacing = "1.5vh", padding = { left = "1.2vh", right = "1.2vh" },
+      children = {
+        ui.text { text = s.label, weight = 1, style = { font = "2.5vh", color = C.dark } },
+        ui.text { id = id .. "_v", text = s.value or "", style = { font = "2.3vh", color = C.mid } },
+      } }
+  else -- select
+    return ui.row { id = id, action = id, height = "6.5vh", width = "100%", crossAlign = "center",
+      spacing = "1.5vh", hoverColor = C.hover, padding = { left = "1.2vh", right = "1.2vh" },
+      children = {
+        ui.text { text = s.label, weight = 1, style = { font = "2.5vh", color = C.dark } },
+        ui.text { id = id .. "_v", text = s.value or "", style = { font = "2.3vh", color = C.mid } },
+        ui.text { text = " ▾", style = { font = "2.3vh", color = C.mid } },
+      } }
+  end
+end
+
 -- ============ 启动页左栏（split_column 左 1/3，仿 PCL2 主页左侧）============
 local function buildHomeSidebar()
   local kids = {}
@@ -401,8 +496,8 @@ end
 
 -- ============ 启动页右区（仿 PCL2 主页右侧大公告卡片）============
 local function buildHomePage()
-  return ui.column { id = "pageHome", weight = 1, crossAlign = "center", padding = "2.5vh",
-    spacing = "2.5vh",
+  return ui.column { id = "pageHome", weight = 1, crossAlign = "center", padding = "1.6vh",
+    spacing = "1.6vh",
     children = {
       card("homeNotice", {
         ui.row { width = "100%", height = "5vh", crossAlign = "center", spacing = "1.5vh",
@@ -609,7 +704,7 @@ local function buildDownloadPage()
       children = { searchCard, card("dlResultCardC", resultCards) } },
   }
   return ui.column { id = "pageDownload", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 联机页（两分支 + 加入/创建行 + 状态行 + 房间条目卡）============
@@ -634,7 +729,7 @@ local function buildMultiPage()
   local slots = {}
   for i = 1, MP_MAX_ROOMS do slots[#slots + 1] = mpRoomSlot(i) end
   return ui.column { id = "pageMulti", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh",
+    padding = "1.6vh", spacing = "1.6vh",
     children = {
       segmentRow("segM", CONFIG.online.branch, "1vh"),
       -- 加入行
@@ -680,38 +775,33 @@ local function buildSettingsPage()
     corner = "1.2vh", shadow = SHADOW, padding = "3vh", crossAlign = "center", spacing = "1.2vh",
     children = {
       ui.image { icon = "sf:shippingbox.fill", size = "8vh", corner = "1.6vh",
-        background = { from = C.accent, to = "#5AA0FF", angle = 30 }, style = { tint = C.white } },
+        background = { from = C.accent, to = C.cyan, angle = 30 }, style = { tint = C.white } },
       ui.text { text = "Pear 启动器", style = { font = "3vh", weight = "bold", color = C.dark } },
       ui.text { text = "版本 · · ·", style = { font = "2.2vh", color = C.mid } },
       ui.text { text = "系统信息 …  ·  设备架构 …", style = { font = "2.2vh", color = C.mid } },
     } }
-  local order = { "launcher_settings", "download_mirror", "video_settings", "gl_renderer",
-                  "control_keys", "java_tuning", "ui_theme", "ai_assistant" }
-  for _, token in ipairs(order) do
-    local spec = CONFIG.settingsSubpages[token]
-    if spec then
-      local rows = {}
-      for gi, g in ipairs(spec.groups or {}) do
-        if gi > 1 then
-          rows[#rows + 1] = ui.divider { height = "0.2vh", background = C.cardBorder }
-        end
-        rows[#rows + 1] = ui.text { text = g.name or "", width = "100%",
-          style = { font = "2.1vh", color = C.mid } }
-        for ri, r in ipairs(g.rows or {}) do
-          rows[#rows + 1] = settingsRow("setRow_" .. token .. "_" .. gi .. "_" .. ri,
-            r.label, r.value, "open_subpage:" .. token)
-        end
-      end
-      if #rows > 0 then
-        kids[#kids + 1] = card("setCard_" .. token, rows, { spacing = "1.2vh" })
-      end
+  -- 分类内容：每分类一个 section（id=setSec_<id>），随左侧目录选中切换可见（行内展开，非跳子页）
+  for gi, g in ipairs(CONFIG.settingsGroups) do
+    local rows = {}
+    rows[#rows + 1] = ui.text { text = (CONFIG.settingsGroupNames[gi] or g.label) .. " · " .. g.label,
+      width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } }
+    for _, s in ipairs(g.rows or {}) do
+      rows[#rows + 1] = settingsItemRow(s)
     end
+    kids[#kids + 1] = ui.column { id = "setSec_" .. g.id, width = "94%", crossAlign = "center",
+      spacing = "2vh", visible = (g.id == setSelCat),
+      children = { card("setCard_" .. g.id, rows, { spacing = "1.5vh" }) } }
   end
-  if #kids == 1 then
-    kids[#kids + 1] = ui.text { text = "启动器暂未提供设置条目。", style = { font = "2.2vh", color = C.mid } }
-  end
+  -- 状态提示条（开关/按钮的即时反馈落点；浅蓝底 H）
+  kids[#kids + 1] = ui.row { id = "setStatusBar", width = "94%", background = C.hintBg,
+    corner = "1vh", crossAlign = "center", spacing = "1.2vh", padding = "1.5vh",
+    children = {
+      ui.text { id = "setStatusIcon", text = "ⓘ", style = { font = "2.8vh", color = C.accent } },
+      ui.text { id = "setStatus", weight = 1, text = CONFIG.settingsStatus,
+        style = { font = "2.2vh", color = C.dark } },
+    } }
   return ui.column { id = "pageSettings", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 更多页（左侧分类 + 右侧分组卡片，仿 PCL 更多页）============
@@ -747,7 +837,7 @@ local function buildMorePage()
     kids[#kids + 1] = ui.text { text = "暂无更多选项。", style = { font = "2.2vh", color = C.mid } }
   end
   return ui.column { id = "pageMore", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 版本设置页（PCL2 风格：概览 / 设置 / Mod 管理 / 资源 / 高级）============
@@ -843,7 +933,7 @@ local function buildVersionSettingsPage()
   }
 
   return ui.column { id = "pageVersionSettings", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh",
+    padding = "1.6vh", spacing = "1.6vh",
     children = {
       section("info",     "概览",       overviewRows),
       section("launch",   "设置",       { card("vsSettingsCard", settingsRows, { spacing = "1.8vh" }) }),
@@ -878,7 +968,7 @@ local function buildVersionDetailPage()
       style = { background = C.transparent, tint = C.dark, font = "2.3vh" } }
   end
   return ui.column { id = "pageVersionDetail", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh",
+    padding = "1.6vh", spacing = "1.6vh",
     children = {
       -- 页眉：返回下载页 + 标题
       ui.row { id = "vdHeader", width = "94%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
@@ -951,7 +1041,7 @@ local function buildVersionManagerPage()
   end
   kids[#kids + 1] = plainButton("vmAdd", "前往下载新版本", false)
   return ui.column { id = "pageVersionManager", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 通用设置子页（token → 标题 + 单一大白卡分组条目；返回设置）============
@@ -975,7 +1065,7 @@ local function buildSettingsSubpage(token, spec)
     end
   end
   return ui.column { id = "sub_" .. token, weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh",
+    padding = "1.6vh", spacing = "1.6vh",
     children = {
       ui.row { id = "sub" .. token .. "Header", width = "94%", height = "6vh",
         crossAlign = "center", spacing = "1.5vh",
@@ -1025,7 +1115,7 @@ local function buildAccountManagerPage()
   end
   kids[#kids + 1] = plainButton("amAdd", "登录 / 添加账号", true)
   return ui.column { id = "pageAccountManager", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 游戏目录二级页（默认 + instances 子目录列表，新建目录）============
@@ -1076,7 +1166,7 @@ local function buildGameDirectoryPage()
         style = { font = "2.3vh", tint = C.accent, weight = "bold" } },
     } }
   return ui.column { id = "pageGameDirectory", weight = 1, crossAlign = "center",
-    padding = "2.5vh", spacing = "2.5vh", children = kids }
+    padding = "1.6vh", spacing = "1.6vh", children = kids }
 end
 
 -- ============ 根构建 ============
@@ -1174,15 +1264,12 @@ local function sidebarItem(id, icon, label, action, dotId)
     } }
 end
 
--- 设置页左侧分类目录侧栏（仿 PCL PageSetupLeft）
+-- 设置页左侧分类目录侧栏（仿 PCL PageSetupLeft；数据驱动 CONFIG.settingsGroups，恒非空）
 local setSelCat = "launcher_settings"
 local function buildSettingsSidebar()
   local kids = { ui.text { text = "设置", width = "100%", style = { font = "2.1vh", color = C.mid } } }
-  for i, s in ipairs(launcher.state and launcher.state.settings or {}) do
-    local token = s.action and s.action:match("open_subpage:(.+)")
-    if token then
-      kids[#kids + 1] = sidebarItem("setCat_" .. token, s.icon, s.label, "setCat:" .. token)
-    end
+  for _, g in ipairs(CONFIG.settingsGroups) do
+    kids[#kids + 1] = sidebarItem("setCat_" .. g.id, g.icon, g.label, "setCat:" .. g.id)
   end
   return kids
 end
@@ -1512,14 +1599,12 @@ function onRemoteVersions(payload)
 end
 
 local function refreshSettingsSidebar()
-  for _, s in ipairs(launcher.state and launcher.state.settings or {}) do
-    local token = s.action and s.action:match("open_subpage:(.+)")
-    if token then
-      local sel = (token == setSelCat)
-      launcher.view("setCat_" .. token):setStyle(sel
-        and { background = C.hover }
-        or  { background = C.card })
-    end
+  for _, g in ipairs(CONFIG.settingsGroups) do
+    local sel = (g.id == setSelCat)
+    local it = launcher.view("setCat_" .. g.id)
+    if it then it:setStyle(sel and { background = C.hover } or { background = C.card }) end
+    local sec = launcher.view("setSec_" .. g.id)
+    if sec then sec:setVisible(sel) end
   end
 end
 
@@ -1741,7 +1826,43 @@ function onClick(id)
   if sc then
     setSelCat = sc
     refreshSettingsSidebar()
-    launcher.action("open_subpage:" .. sc)
+    -- 行内展开当前分类（数据驱动内容已在 pageSettings 预渲染），不再跳转到子页
+    launcher.view("dlProgress"):setVisible(false)
+    return
+  end
+  -- 设置项：开关切换 / 选择器 / 描边按钮（M5：点击真正产生反馈）
+  local se = id:match("^setit_(.+)$")
+  if se then
+    local def
+    for _, g in ipairs(CONFIG.settingsGroups) do
+      for _, s in ipairs(g.rows or {}) do
+        if s.id == se then def = s; break end
+      end
+      if def then break end
+    end
+    if def then
+      local statusView = launcher.view("setStatus")
+      if def.type == "toggle" then
+        local on = not toggleOn(se)
+        setToggles[se] = on
+        local sw = launcher.view("setit_" .. se .. "_sw")
+        if sw then
+          sw:setText(on and "开" or "关")
+          sw:setStyle(on
+            and { background = C.accent, tint = C.white }
+            or  { background = C.cardBorder, tint = C.white })
+        end
+        if statusView then statusView:setText("「" .. def.label .. "」已" .. (on and "开启" or "关闭")) end
+      elseif def.type == "button" then
+        if statusView then
+          statusView:setText("已执行：「" .. def.label .. "」（引擎预留能力，后续接入真实实现）")
+        end
+      else -- select / text
+        if statusView then
+          statusView:setText("「" .. def.label .. "」当前为：" .. (def.value or ""))
+        end
+      end
+    end
     return
   end
   local vsc = id:match("^vsCat:(.+)$")
