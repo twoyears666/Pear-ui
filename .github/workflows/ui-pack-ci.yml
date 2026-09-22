@@ -1,0 +1,44 @@
+name: UI Pack CI
+
+# UI 包 CI：Lua 语法、manifest、配色、zip 完整性校验。
+# push 到 main 或对 main 开 PR 时触发，也可手动触发（workflow_dispatch）。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate UI pack
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pcl2-totoro-blue
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Lua 5.4
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.4"
+
+      - name: Lua 语法检查
+        run: luac -p main.lua
+
+      - name: 校验 manifest.json
+        run: python3 validate_pack.py manifest --file=main.lua --colors=colors.json
+
+      - name: 校验 colors.json 为合法 JSON 且含主题键
+        run: python3 validate_pack.py colors
+
+      - name: 校验打包 zip 内容
+        run: |
+          entries=$(unzip -l pcl2-totoro-blue.zip)
+          for f in manifest.json main.lua colors.json; do
+            echo "$entries" | grep -q "$f" || { echo "zip 缺少 $f"; exit 1; }
+          done
+          echo "zip 内容完整"
