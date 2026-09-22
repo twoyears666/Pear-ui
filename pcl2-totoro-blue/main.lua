@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.14.0" }
+  return { name = "PCL 浅色", version = "1.14.1" }
 end
 
 local C = {
@@ -49,6 +49,9 @@ local BORDER   = { width = "0.12vh", color = C.cardBorder }
 local BORDER_A = { width = "0.18vh", color = C.accentBorder }
 local BORDER_D = { width = "0.18vh", color = C.danger }
 local SHADOW   = { blur = "0.3vh", opacity = 0.07, x = 0, y = "0.15vh" }
+
+-- 当前设置分类选中项（文件顶部声明，避免 buildSettingsPage 前置引用读到 nil 全局）
+local setSelCat = "launcher_settings"
 
 local TABS = {
   { id = "tab.home",     label = "启动", icon = "sf:house.fill",                             action = "open:home",       page = "home" },
@@ -1265,7 +1268,7 @@ local function sidebarItem(id, icon, label, action, dotId)
 end
 
 -- 设置页左侧分类目录侧栏（仿 PCL PageSetupLeft；数据驱动 CONFIG.settingsGroups，恒非空）
-local setSelCat = "launcher_settings"
+-- 注意：setSelCat 需在文件前面声明（见顶部），此处不可再 local，否则 buildSettingsPage 前置引用读到 nil。
 local function buildSettingsSidebar()
   local kids = { ui.text { text = "设置", width = "100%", style = { font = "2.1vh", color = C.mid } } }
   for _, g in ipairs(CONFIG.settingsGroups) do
