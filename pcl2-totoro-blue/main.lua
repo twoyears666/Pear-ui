@@ -1753,6 +1753,7 @@ local function refreshGameDirectory()
 end
 
 function onClick(id)
+  launcher.log("[Lua.onClick] id=" .. tostring(id))
   for _, t in ipairs(TABS) do
     if t.id == id then selectTab(t.id) return end
   end
