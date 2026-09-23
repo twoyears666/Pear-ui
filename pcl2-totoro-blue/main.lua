@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.14.3" }
+  return { name = "PCL 浅色", version = "1.18.0-beta" }
 end
 
 local C = {
@@ -42,6 +42,7 @@ local C = {
   cyan        = "$color:brandCyan",
   pink        = "$color:brandPink",
   hintBg      = "$color:faintBlue",           -- 提示条浅蓝底 #EAF3FC
+  faintBlue   = "$color:faintBlue",           -- 浅蓝底（胶囊按钮/图标底）
   fieldBorder = "$color:fieldBorder",
 }
 
@@ -125,6 +126,11 @@ local CONFIG = {
     maxVersionRows = 12,     -- 每张版本卡最多渲染的版本行（真实列表很长，滚动超出部分截断）
     -- 版本详情页加载器组合（仿 PCL：默认「无」，可切换 Fabric/Forge 等后再下载）
     loaders = { "无", "Fabric", "Forge", "Quilt", "NeoForge" },
+    -- PCL II 安装面板：Minecraft 卡标题 / 组件版本槽位数 / 加载器互斥（不可同装，选中其一则另一灰禁用）
+    mcLabel = "Minecraft",
+    compVersionSlots = 5,
+    compConflictTip = "与 Forge 不兼容",
+    conflicts = { { a = "Forge", b = "Fabric" }, { a = "Forge", b = "Quilt" }, { a = "Forge", b = "NeoForge" } },
     -- 分组 key → 版本类型显示名（详情页副标题用，仅结构，不写死具体版本）
     typeNames = { latest_snapshot = "最新快照", latest_release = "最新正式版",
       release = "正式版", snapshot = "快照", april_fools = "愚人节版本", ancient = "远古版" },
@@ -289,14 +295,18 @@ local function topTab(t)
   }
 end
 
--- 白底圆角卡片（vertical_flow 内的一行卡片；内容 94% = 左右留边 3%）
--- opts 可选：padding/spacing 覆盖默认留白（保证文字与圆角边框有足够间距），
---          crossAlign="center" 时子元素按自身宽度居中（用于版本行卡内左右留边）。
+-- 白底圆角卡片（通用卡片规范，apply to all 界面）：
+--   外边距：水平居中、两侧各留白 15% —— 卡宽 70%；垂直：首卡距顶 4%、卡距 2%。
+--   内边距：内容距卡缘水平 3%(用 vh 近似)、垂直 1.5%。
+--   圆角：= 屏高 1%（1vh）。
+-- opts 可覆盖 width/padding/spacing/crossAlign/visible/height。
 local function card(id, children, opts)
   opts = opts or {}
-  return ui.column { id = id, width = "94%", background = C.card, border = BORDER,
-    corner = "1.2vh", shadow = SHADOW, padding = opts.padding or "3vh",
-    spacing = opts.spacing or "2vh", crossAlign = opts.crossAlign, visible = opts.visible, children = children }
+  return ui.column { id = id, width = opts.width or "70%", background = C.card, border = BORDER,
+    corner = opts.corner or "1vh", shadow = SHADOW,
+    padding = opts.padding or { left = "2.4vh", right = "2.4vh", top = "1.5vh", bottom = "1.5vh" },
+    spacing = opts.spacing or "2vh", crossAlign = opts.crossAlign,
+    height = opts.height, visible = opts.visible, children = children }
 end
 
 -- 整行条目卡（row_item）：左图标 + 中列(标题/副题) + 右文本；整行可点、hover 浅蓝，图标圆角
@@ -545,6 +555,16 @@ local dlExpanded = {} -- 下载页版本分组折叠状态
 local dlCurrent = nil
 local dlLoader = 1
 
+-- ===== PCL II 下载安装面板状态（行内选择，不再跳详情页）=====
+local PLC = {}       -- 选中 Minecraft 版本 id（默认取 CONFIG 默认版本）
+PLC.mc = CONFIG.download.defaultVersion or ""
+PLC.mcOpen = false   -- Minecraft 版本选择列表展开
+local compSel = {}   -- 组件卡（加载器）当前选中版本：index → string/nil
+local compOpen = {}  -- 组件卡展开状态：index → bool
+
+-- 由 download.versions 平铺填充 Minecraft 行内版本列表
+local flatVersions = {}
+
 -- 版本行点击后打开详情页：填入所选版本信息并保持当前页高亮为「下载」。
 local function openDetailFor(cid, idx)
   local it = (dlGroups[cid] or {})[idx]
@@ -566,11 +586,14 @@ end
 local function refreshDownloadVersions()
   local p = launcher.service("download", "versions") or {}
   if type(p) ~= "table" or not p.ok then return end
+  dlGroups = {}
+  flatVersions = {}
   local latest = { latest_release = p.latestRelease, latest_snapshot = p.latestSnapshot }
   for cid, it in pairs(latest) do
-    launcher.view("dlv_" .. cid .. "_1_name"):setText(it and it.id or "…")
-    launcher.view("dlv_" .. cid .. "_1_date"):setText((it and it.date) or "")
-    dlGroups[cid] = it and { it } or {}
+    if it and it.id then
+      dlGroups[cid] = { it }
+      flatVersions[#flatVersions + 1] = it
+    end
   end
   for _, g in ipairs(CONFIG.download.vanillaGroups) do
     local items = {}
@@ -578,65 +601,202 @@ local function refreshDownloadVersions()
       if grp.key == g.key then items = grp.items or {} end
     end
     dlGroups[g.key] = items
-    local count = #items
-    local cntView = launcher.view("dlgCount_" .. g.key)
-    if cntView then cntView:setText("(" .. count .. ")") end
-    for i = 1, CONFIG.download.maxVersionRows do
-      local it = items[i]
-      launcher.view("dlv_" .. g.key .. "_" .. i .. "_name"):setText(it and it.id or "")
-      launcher.view("dlv_" .. g.key .. "_" .. i .. "_date"):setText(it and ((it.date) or "") or "")
+    for _, it in ipairs(items) do flatVersions[#flatVersions + 1] = it end
+  end
+end
+
+-- PCL II 安装面板运行态刷新：Minecraft 行内列表 + 组件行 + 高亮/按钮可见性
+local function refreshInstallPanel()
+  local D = CONFIG.download
+  local maxR = D.maxVersionRows or 12
+  -- Minecraft 行内列表
+  for i = 1, maxR do
+    local it = flatVersions[i]
+    local nameV = launcher.view("dlIv_" .. i .. "_name")
+    local dateV = launcher.view("dlIv_" .. i .. "_date")
+    if nameV then nameV:setText(it and it.id or "") end
+    if dateV then dateV:setText(it and (it.date or "") or "") end
+    local icoV = launcher.view("dlIv_" .. i .. "_ico")
+    if icoV then icoV:setStyle({ tint = (it and it.id == PLC.mc) and C.accent or C.mid }) end
+    local rowV = launcher.view("dlIv_" .. i)
+    if rowV then rowV:setVisible(PLC.mcOpen and it ~= nil) end
+  end
+  -- 预览卡 + Minecraft 卡文本
+  launcher.view("insVersion"):setText(PLC.mc ~= "" and PLC.mc or "未选择版本")
+  launcher.view("insMcVer"):setText(PLC.mc ~= "" and PLC.mc or "未选择版本")
+  -- 组件卡：✓按钮/×可见性/冲突禁用（与已选加载器互斥则灰禁用整卡）
+  local selected = {}
+  for i, nm in ipairs(D.loaders or {}) do if compSel[i] then selected[nm] = true end end
+  for i, nm in ipairs(D.loaders or {}) do
+    local bad = false
+    for _, c in ipairs(D.conflicts or {}) do
+      local other = (c.a == nm) and c.b or ((c.b == nm) and c.a or nil)
+      if other and selected[other] then bad = true break end
+    end
+    local sel = compSel[i]
+    local hV = launcher.view("dlCompH_" .. i)
+    local btnV = launcher.view("dlCompBtn_" .. i)
+    if hV then hV:setEnabled(not bad) end
+    if btnV then btnV:setVisible(not bad) end
+    launcher.view("dlCompVer_" .. i):setText(bad and (D.compConflictTip or "与加载器不兼容") or (sel or "未选择"))
+    local xV = launcher.view("dlCompX_" .. i)
+    if xV then xV:setVisible(sel ~= nil) end
+    -- 组件行内列表折叠状态
+    local open = compOpen[i] == true
+    for j = 1, (D.compVersionSlots or 5) do
+      local rv = launcher.view("dlCompV_" .. i .. "_" .. j)
+      if rv then rv:setVisible(open) end
     end
   end
 end
 
-local function refreshDownloadGroupVisibility()
-  for _, g in ipairs(CONFIG.download.vanillaGroups) do
-    local v = launcher.view("dlgCard_" .. g.key)
-    if v then v:setVisible(dlExpanded[g.key] == true) end
-  end
-end
-
 -- ============ 下载页（无侧栏、通栏纵向流：分组卡片）============
+-- PCL II 安装面板：预览卡 + Minecraft 卡 + 组件卡×N（行内下拉，贴合连成一体）
 local function buildDownloadPage()
-  -- 右侧内容按分类：dlSec_1 原版(最新版本) / dlSec_2.. 社区资源(搜索+结果列表)
+  local D = CONFIG.download
+  local maxR = D.maxVersionRows or 12
+  local compN = #(D.loaders or {})
+
+  -- Minecraft 卡内版本行（贴合：无外边距，顶部细分割线）
+  local function mcRow(i)
+    return ui.row { id = "dlIv_" .. i, width = "100%", height = "7vh", background = C.card,
+      corner = "0", border = { width = "0", color = C.cardBorder }, hoverColor = C.hover,
+      crossAlign = "center", spacing = "1.2vh", padding = { left = "1.2vh", right = "1.2vh" },
+      action = "dlIv:" .. i, visible = false,
+      children = {
+        ui.image { id = "dlIv_" .. i .. "_ico", icon = "sf:cube.fill", size = "2.6vh",
+          style = { tint = C.mid } },
+        ui.column { weight = 1, crossAlign = "stretch", spacing = "0.4vh", children = {
+          ui.text { id = "dlIv_" .. i .. "_name", text = "", width = "100%",
+            style = { font = "2.3vh", color = C.dark } },
+          ui.text { id = "dlIv_" .. i .. "_date", text = "", width = "100%",
+            style = { font = "1.9vh", color = C.mid } },
+        } },
+        chevron(),
+      } }
+  end
+
+  -- 组件卡内版本行（结构占位；加载器版本服务未接入，仅描述结构）
+  local function compRow(i, j)
+    return ui.row { id = "dlCompV_" .. i .. "_" .. j, width = "100%", height = "7vh",
+      background = C.card, corner = "0", border = { width = "0", color = C.cardBorder },
+      hoverColor = C.hover, crossAlign = "center", spacing = "1.2vh",
+      padding = { left = "1.2vh", right = "1.2vh" }, action = "dlCompV:" .. i .. ":" .. j,
+      visible = false,
+      children = {
+        ui.image { icon = "sf:cube.fill", size = "2.6vh", style = { tint = C.mid } },
+        ui.text { id = "dlCompV_" .. i .. "_" .. j .. "_name", weight = 1, text = "· · ·",
+          style = { font = "2.3vh", color = C.dark } },
+        chevron(),
+      } }
+  end
+
+  -- 组件卡头部：左名称 / 中 图标+当前版本 / 右 按钮区（未选只有>，选中 >+×）
+  local function compHeader(i)
+    local nm = D.loaders[i]
+    local btnKids = {
+      ui.button { id = "dlCompX_" .. i, label = "✕", width = "3.5vh", height = "3.5vh",
+        corner = "pill", background = C.cardBorder, action = "dlCompX:" .. i,
+        style = { font = "2.6vh", tint = C.dark }, visible = false },
+      ui.button { id = "dlCompC_" .. i, label = "›", width = "3.5vh", height = "3.5vh",
+        corner = "pill", background = C.faintBlue, action = "dlCompC:" .. i,
+        style = { font = "3vh", tint = C.accent } },
+    }
+    return {
+      ui.text { text = nm, weight = 1, style = { font = "2.6vh", weight = "bold", color = C.dark } },
+      ui.row { weight = 1, height = "7vh", crossAlign = "center", spacing = "0.8vh", children = {
+        ui.image { icon = "sf:wrench.and.screwdriver.fill", size = "3vh",
+          style = { tint = C.mid } },
+        ui.text { id = "dlCompVer_" .. i, text = "未选择", style = { font = "2.3vh", color = C.mid } },
+      } },
+      ui.row { id = "dlCompBtn_" .. i, width = "9vh", crossAlign = "center",
+        spacing = "0.7vh", children = btnKids },
+    }
+  end
+
   local sec1 = ui.column { id = "dlvRoot", width = "100%", crossAlign = "center", spacing = "2vh",
     children = (function()
-      local cards = {
-        -- 卡片1：最新版本（最新快照 / 最新版本，可点进入详情）
-        card("dlLatestCard", {
-          ui.text { text = "最新版本", width = "100%", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-          versionSlot("latest_snapshot", 1), versionSlot("latest_release", 1),
-        }, { crossAlign = "center" }),
-      }
-      -- 卡片2..5：可折叠分组标题 + 版本槽位卡片（仿 PCL2 下载页）
-      for _, g in ipairs(CONFIG.download.vanillaGroups) do
-        cards[#cards + 1] = ui.row {
-          id = "dlgHeader_" .. g.key, width = "94%", height = "6.5vh", background = C.card,
-          border = BORDER, corner = "1.2vh", shadow = SHADOW, hoverColor = C.hover,
-          crossAlign = "center", padding = { left = "2vh", right = "2vh" }, spacing = "1.5vh",
-          action = "dlgHeader:" .. g.key,
+      local cards = {}
+
+      -- 卡1 安装预览卡：左图标 + (版本号/摘要) + 开始安装 + 版本名称输入
+      cards[#cards + 1] = ui.column { id = "dlPrevCard", width = "70%", height = "14vh",
+        background = C.card, border = BORDER, corner = "1vh", shadow = SHADOW,
+        padding = { left = "1.5vh", right = "1.5vh", top = "1.4vh", bottom = "1.4vh" },
+        spacing = "0.8vh", crossAlign = "stretch",
+        children = {
+          ui.row { width = "100%", height = "6vh", crossAlign = "center", spacing = "1.5vh",
+            children = {
+              ui.image { icon = "sf:shippingbox.fill", size = "6vh", corner = "1.2vh",
+                background = { from = C.accent, to = C.cyan, angle = 30 }, style = { tint = C.white } },
+              ui.column { weight = 1, justify = "center", spacing = "0.5vh", children = {
+                ui.text { id = "insVersion", text = PLC.mc, width = "100%",
+                  style = { font = "2.9vh", weight = "bold", color = C.dark } },
+                ui.text { id = "insSummary", text = D.installHint, width = "100%",
+                  style = { font = "2.1vh", color = C.mid } },
+              } },
+              ui.button { id = "insStart", label = "开始安装", width = "24vh", height = "6vh",
+                background = C.accent, corner = "0.9vh", action = "insStart",
+                style = { font = "2.4vh", weight = "bold", tint = C.white } },
+            } },
+          ui.divider { height = "0.16vh", background = C.cardBorder },
+          ui.row { width = "100%", height = "4.5vh", crossAlign = "center", spacing = "1.2vh",
+            children = {
+              ui.text { text = "版本名称", width = "12vh", style = { font = "2.3vh", color = C.dark } },
+              ui.input { id = "insNameIn", text = "", placeholder = PLC.mc, weight = 1,
+                height = "4.5vh", style = { font = "2.3vh", color = C.dark } },
+            } },
+        } }
+
+      -- 卡2 Minecraft 版本卡 + 行内下拉（贴合一体）
+      local mcRows = {}
+      for i = 1, maxR do mcRows[#mcRows + 1] = mcRow(i) end
+      cards[#cards + 1] = ui.column { id = "dlMcW", width = "70%", background = C.card,
+        border = BORDER_A, corner = "1vh", shadow = SHADOW, padding = "0", overflow = "hidden",
+        children = {
+          ui.row { id = "dlMcH", width = "100%", height = "7vh", background = C.card,
+            hoverColor = C.hover, crossAlign = "center", spacing = "1vh",
+            padding = { left = "1.5vh", right = "1.5vh" }, action = "dlMcH",
+            children = {
+              ui.text { text = D.mcLabel or "Minecraft", weight = 1,
+                style = { font = "2.6vh", weight = "bold", color = C.accent } },
+              ui.row { weight = 1, height = "7vh", crossAlign = "center", spacing = "0.8vh",
+                children = {
+                  ui.image { icon = "sf:cube.fill", size = "3vh", style = { tint = C.mid } },
+                  ui.text { id = "insMcVer", text = PLC.mc, style = { font = "2.4vh", color = C.dark } },
+                } },
+              ui.button { id = "dlMcBack", label = "返回", width = "12vh", height = "4vh",
+                corner = "pill", background = C.faintBlue, action = "dlMcBack",
+                style = { font = "2.2vh", tint = C.accent } },
+            } },
+          -- 展开列表（与卡片零间距贴合，宽同 70%）
+          ui.column { id = "dlMcList", width = "100%", crossAlign = "stretch",
+            spacing = "0", children = mcRows },
+        } }
+
+      -- 组件卡片×N：行内下拉（贴合）；冲突组件灰禁用
+      for i = 1, compN do
+        local crows = {}
+        for j = 1, (D.compVersionSlots or 5) do crows[#crows + 1] = compRow(i, j) end
+        cards[#cards + 1] = ui.column { id = "dlCompW_" .. i, width = "70%", background = C.card,
+          border = BORDER, corner = "1vh", shadow = SHADOW, padding = "0", overflow = "hidden",
           children = {
-            ui.text { text = g.name, weight = 1, style = { font = "2.8vh", weight = "bold", color = C.dark } },
-            ui.text { id = "dlgCount_" .. g.key, text = "(0)", style = { font = "2.2vh", color = C.mid } },
-            chevron(),
+            ui.row { id = "dlCompH_" .. i, width = "100%", height = "7vh", background = C.card,
+              hoverColor = C.hover, crossAlign = "center", spacing = "1vh",
+              padding = { left = "1.5vh", right = "1.5vh" }, action = "dlCompH:" .. i,
+              children = compHeader(i) },
+            ui.column { id = "dlCompList_" .. i, width = "100%", crossAlign = "stretch",
+              spacing = "0", children = crows },
           } }
-        local rows = {}
-        for i = 1, CONFIG.download.maxVersionRows do rows[#rows + 1] = versionSlot(g.key, i) end
-        cards[#cards + 1] = card("dlgCard_" .. g.key, rows,
-          { crossAlign = "center", visible = (dlExpanded[g.key] == true) })
       end
-      -- 兼容性提示 + 开始下载 + 下载进度区
-      cards[#cards + 1] = ui.row { width = "100%", background = C.faintBlue, corner = "1vh",
+
+      -- 兼容性提示 + 下载进度区
+      cards[#cards + 1] = ui.row { width = "70%", background = C.faintBlue, corner = "1vh",
         crossAlign = "center", spacing = "1vh", padding = "1.2vh",
         children = {
           ui.text { text = "ⓘ", style = { font = "2.6vh", color = C.accent } },
-          ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2vh", color = C.dark } },
+          ui.text { text = D.installHint, weight = 1, style = { font = "2vh", color = C.dark } },
         } }
-      cards[#cards + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "2vh",
-        children = { ui.button { id = "dlInstall", label = "开始下载 / 安装", weight = 1, height = "5.5vh",
-          background = C.card, border = BORDER_A, corner = "0.7vh", action = "dlStart",
-          style = { font = "2.4vh", weight = "bold", tint = C.accent } } } }
-      cards[#cards + 1] = ui.column { id = "dlProgress", width = "100%", visible = false, spacing = "1vh",
+      cards[#cards + 1] = ui.column { id = "dlProgress", width = "70%", visible = false, spacing = "1vh",
         crossAlign = "stretch",
         children = {
           ui.row { height = "1.6vh", background = C.faintBlue, corner = "pill", overflow = "hidden",
@@ -1740,7 +1900,7 @@ function onPageChange(page)
   if page == "download" then
     refreshDownloadSidebar()
     refreshDownloadVersions()
-    refreshDownloadGroupVisibility()
+    refreshInstallPanel()
     launcher.view("dlSec_1"):setVisible(dlSelCat == 1)
     launcher.view("dlSecC"):setVisible(dlSelCat > 1)
     if dlSelCat > 1 then refreshCommunitySearch() end
@@ -1791,11 +1951,86 @@ function onClick(id)
   if id == "cap.mojang" then selectCap(1) return end
   if id == "cap.microsoft" then selectCap(2) return end
   if id == "cap.offline" then selectCap(3) return end
-  if id == "dlStart" then
+  local compSlots = CONFIG.download.compVersionSlots or 5
+  local function refreshCompRows(i)
+    local open = compOpen[i] == true
+    for j = 1, compSlots do
+      local rv = launcher.view("dlCompV_" .. i .. "_" .. j)
+      if rv then rv:setVisible(open) end
+    end
+  end
+  local function setMcList(open)
+    PLC.mcOpen = open
+    local D = CONFIG.download
+    for i = 1, (D.maxVersionRows or 12) do
+      local it = flatVersions[i]
+      local rowV = launcher.view("dlIv_" .. i)
+      if rowV then rowV:setVisible(open and it ~= nil) end
+    end
+  end
+  -- 「开始安装」：读输入框版本名 + 选中 Minecraft 版本 → 发起下载
+  if id == "insStart" then
+    local name = (launcher.view("insNameIn") and launcher.view("insNameIn"):getText()) or ""
+    name = tostring(name):gsub("^%s+", ""):gsub("%s+$", "")
+    if PLC.mc == "" or PLC.mc == nil then
+      local st = launcher.view("dlProgressLabel")
+      if st then st:setText("请先选择 Minecraft 版本") end
+      launcher.view("dlProgress"):setVisible(true)
+      return
+    end
     launcher.view("dlProgress"):setVisible(true)
-    launcher.view("dlProgressLabel"):setText("准备中…")
+    launcher.view("dlProgressLabel"):setText("准备下载 " .. PLC.mc .. (name ~= "" and ("（" .. name .. "）") or "") .. " …")
     launcher.view("dlBarFill"):setStyle({ width = "0%" })
-    launcher.service("download", "start", { versionId = CONFIG.download.defaultVersion })
+    launcher.service("download", "start", { versionId = PLC.mc, name = name })
+    return
+  end
+  -- Minecraft 卡：整卡点击 / 返回 切换行内版本列表
+  if id == "dlMcH" or id == "dlMcBack" then setMcList(not PLC.mcOpen) return end
+  local mcv = id:match("^dlIv_(%d+)$")
+  if mcv then
+    local it = flatVersions[tonumber(mcv)]
+    if it and it.id then
+      PLC.mc = it.id
+      setMcList(false)
+      refreshInstallPanel()
+      launcher.view("insVersion"):setText(PLC.mc)
+      launcher.view("insMcVer"):setText(PLC.mc)
+    end
+    return
+  end
+  -- 组件卡：整卡 / › 切换行内列表；× 清除选择；版本行选择
+  local cph = id:match("^dlCompH:(%d+)$")
+  if cph then
+    local i = tonumber(cph)
+    if launcher.view("dlCompH_" .. i) then
+      compOpen[i] = not (compOpen[i] == true)
+      refreshCompRows(i)
+    end
+    return
+  end
+  local cpc = id:match("^dlCompC:(%d+)$")
+  if cpc then
+    local i = tonumber(cpc)
+    compOpen[i] = not (compOpen[i] == true)
+    refreshCompRows(i)
+    return
+  end
+  local cpx = id:match("^dlCompX:(%d+)$")
+  if cpx then
+    local i = tonumber(cpx)
+    compSel[i] = nil
+    compOpen[i] = false
+    refreshCompRows(i)
+    refreshInstallPanel()
+    return
+  end
+  local cpv = id:match("^dlCompV:(%d+):(%d+)$")
+  if cpv then
+    local i, j = tonumber(cpv[1]), tonumber(cpv[2])
+    compSel[i] = "已选择"
+    compOpen[i] = false
+    refreshCompRows(i)
+    refreshInstallPanel()
     return
   end
   -- 版本行点击：进入该版本的详情页（信息 + 加载器选择），由详情页发起下载
@@ -1837,12 +2072,6 @@ function onClick(id)
     launcher.view("dlSecC"):setVisible(dlSelCat > 1)
     if dlSelCat > 1 then refreshCommunitySearch() end
     launcher.view("dlTitle"):setText(CONFIG.download.titleByCat[dlSelCat] or "")
-    return
-  end
-  local dlg = id:match("^dlgHeader_(%w+)$")
-  if dlg then
-    dlExpanded[dlg] = not (dlExpanded[dlg] == true)
-    refreshDownloadGroupVisibility()
     return
   end
   -- 社区资源：搜索源切换 / 关键词输入 / 搜索 / 重置 / 点击结果下载
