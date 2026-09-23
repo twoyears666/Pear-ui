@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.18.0-beta" }
+  return { name = "PCL 浅色", version = "1.20.0-beta" }
 end
 
 local C = {
@@ -578,7 +578,9 @@ local flatVersions = {}
 dlLevel = "groups"
 -- 分组展开状态：groupkey → bool（下载页首屏分组列表内联展开）
 dlOpenGroup = {}
-local DLG_ROW = 6 -- 每个版本分组最多内联展开的版本行数
+-- 原版版本分组内联展开的最大行数（引擎树静态构建，无动态增删节点，故用较大固定上限；
+-- 遥控版本清单更新到 >40 时基本可涵盖主流版本；剩余由列表提示补足）
+local DLG_ROW = 60
 
 -- 版本行点击后打开详情页：填入所选版本信息并保持当前页高亮为「下载」。
 local function openDetailFor(cid, idx)
@@ -685,6 +687,14 @@ local function refreshDownloadGroups()
     end
     local hV = launcher.view("dlGh_" .. key)
     if hV then hV:setStyle({ background = open and C.hover or C.card }) end
+    -- 超上限时提示剩余数量
+    local total = #rows
+    local hintRow = launcher.view("dlGrpHint_" .. key .. "_row")
+    if hintRow then hintRow:setVisible(open and total > DLG_ROW) end
+    local hintV = launcher.view("dlGrpHint_" .. key)
+    if hintV and total > DLG_ROW then
+      hintV:setText("本组共 " .. total .. " 个版本，先展示前 " .. DLG_ROW .. " 个（完整列表需引擎动态列表）")
+    end
   end
 end
 
@@ -741,6 +751,11 @@ local function buildDownloadPage()
       for j = 1, DLG_ROW do vrs[#vrs + 1] = grpVersionRow(g.key, j) end
       rows[#rows + 1] = ui.column { id = "dlGrpList_" .. g.key, width = "100%",
         crossAlign = "stretch", spacing = "0", children = vrs }
+      rows[#rows + 1] = ui.row { id = "dlGrpHint_" .. g.key .. "_row", width = "100%",
+        height = "4.5vh", justify = "center", crossAlign = "center", visible = false,
+        padding = { left = "1.6vh", right = "1.6vh" },
+        children = { ui.text { id = "dlGrpHint_" .. g.key, text = "", width = "100%",
+          style = { font = "2vh", color = C.mid, align = "center" } } } }
     end
     return ui.column { id = "dlGroupsCard", width = "70%", background = C.card, border = BORDER,
       corner = "1vh", shadow = SHADOW, padding = "0", overflow = "hidden",
@@ -2144,7 +2159,8 @@ function onClick(id)
     refreshDownloadGroups()
     return
   end
-  local dgv = id:match("^dlGrpVer_(.+):(%d+)$")
+  -- 引擎派发的版本行节点 id 为下划线形式：dlGrpVer_<key>_<j>（key 可能含下划线，如 april_fools）
+  local dgv = id:match("^dlGrpVer_(.+)_(%d+)$")
   if dgv then
     local it = (dlGroups[dgv[1]] or {})[tonumber(dgv[2])]
     if it and it.id then
