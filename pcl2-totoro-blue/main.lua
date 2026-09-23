@@ -824,7 +824,7 @@ local function buildMorePage()
               ui.image { icon = "sf:paintbrush.fill", size = "4.5vh", corner = "pill",
                 background = C.faintBlue, style = { tint = C.accent } },
               ui.text { text = "主题包名称", weight = 1, style = { font = "2.6vh", color = C.dark } },
-              ui.text { text = "PCL 浅色", style = { font = "2.5vh", color = C.mid } },
+              ui.text { id = "moreThemeName_text", text = "PCL 浅色", style = { font = "2.5vh", color = C.mid } },
             } },
           ui.row { id = "moreThemeVer", height = "6.5vh", crossAlign = "center",
             spacing = "1.6vh", padding = "1.8vh",
@@ -840,7 +840,7 @@ local function buildMorePage()
     for _, rr in ipairs(g.rows) do
       local rightNode
       if rr.right == "version" then
-        rightNode = ui.text { text = "· · ·", style = { font = "2.6vh", color = C.mid } }
+        rightNode = ui.text { id = rr.id .. "_val", text = "· · ·", style = { font = "2.6vh", color = C.mid } }
       else
         rightNode = chevron()
       end
@@ -1683,6 +1683,37 @@ local function refreshMoreContent()
   for _, g in ipairs(CONFIG.moreGroups) do
     local v = launcher.view("moreSec_" .. g.name)
     if v then v:setVisible(g.name == moreSelCat) end
+  end
+  -- 动态填充更多页版本类条目：主题信息卡 + 标注 right="version" 的行。
+  -- 数据来自 launcher.getState() 快照（引擎 source of truth），不在此硬编码。
+  local st = launcher.getState and launcher.getState() or {}
+  local ui = (type(st.ui) == "table") and st.ui or nil
+  local themeName = launcher.view("moreThemeName_text")
+  local themeVersion = launcher.view("moreThemeVersion")
+  if themeName and ui and ui.name and ui.name ~= "" then themeName:setText(ui.name) end
+  if themeVersion and ui and ui.version and ui.version ~= "" then
+    themeVersion:setText(ui.version)
+  else
+    -- 引擎未提供包版本时退回「本地已安装默认版本」，避免显示"···"旧占位。
+    local defVer = launcher.view("moreDefaultVersion_val")
+    if themeVersion and defVer then themeVersion:setText(defVer:getText() or "") end
+  end
+  for _, g in ipairs(CONFIG.moreGroups) do
+    for _, rr in ipairs(g.rows or {}) do
+      if rr.right == "version" and rr.id then
+        local val = launcher.view(rr.id .. "_val")
+        if val then
+          local text
+          if rr.id == "moreDefaultVersion" then
+            local acc = (type(st.version) == "table" and st.version.name) or ""
+            text = (acc ~= "" and acc) or "未选择"
+          else
+            text = "· · ·" -- 其他 future 版本行暂保结构占位
+          end
+          val:setText(text)
+        end
+      end
+    end
   end
 end
 
