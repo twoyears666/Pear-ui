@@ -1839,21 +1839,21 @@ function onClick(id)
     launcher.view("dlTitle"):setText(CONFIG.download.titleByCat[dlSelCat] or "")
     return
   end
-  local dlg = id:match("^dlgHeader:(%w+)$")
+  local dlg = id:match("^dlgHeader_(%w+)$")
   if dlg then
     dlExpanded[dlg] = not (dlExpanded[dlg] == true)
     refreshDownloadGroupVisibility()
     return
   end
   -- 社区资源：搜索源切换 / 关键词输入 / 搜索 / 重置 / 点击结果下载
-  if id == "dlPick:source" then
+  if id == "dlSrcRow" then
     dlSource = (dlSource % #CONFIG.download.searchSources) + 1
     launcher.view("dlSrcVal"):setText(commSource().name or "…")
     clearCommunityResults()
     launcher.view("dlCommStatus"):setText(CONFIG.download.searchStatusPreset)
     return
   end
-  if id == "dlPick:keyword" then
+  if id == "dlKwRow" then
     launcher.service("community", "promptKeyword", { category = commCategory() })
     return
   end
@@ -1866,7 +1866,7 @@ function onClick(id)
     launcher.view("dlCommBarBox"):setVisible(false)
     return
   end
-  local ci = id:match("^dlComm:(%d+)$")
+  local ci = id:match("^dlComm_(%d+)$")
   if ci then
     local it = dlCommItems[tonumber(ci)]
     if it and not commDownloading then
@@ -1882,7 +1882,7 @@ function onClick(id)
     end
     return
   end
-  local sc = id:match("^setCat:(.+)$")
+  local sc = id:match("^setCat_(.+)$")
   if sc then
     setSelCat = sc
     refreshSettingsSidebar()
@@ -1925,14 +1925,14 @@ function onClick(id)
     end
     return
   end
-  local vsc = id:match("^vsCat:(.+)$")
+  local vsc = id:match("^vsCat_(.+)$")
   if vsc then
     vsSelCat = vsc
     refreshVersionSettingsSidebar()
     refreshVersionSettingsContent()
     return
   end
-  local mc = id:match("^moreCat:(.+)$")
+  local mc = id:match("^moreCat_(.+)$")
   if mc then
     moreSelCat = mc
     refreshMoreSidebar()
@@ -1943,13 +1943,18 @@ function onClick(id)
   if r then selectSegment("segR", tonumber(r), tonumber(i)) return end
   local m = id:match("^segM_(%d+)$")
   if m then selectSegment("segM", 3, tonumber(m)) return end
-  local gd = id:match("^gdSelect:(.+)$")
+  local gd = id:match("^gdPick(%d+)$")
   if gd then
-    launcher.service("gameDir", "set", { name = gd })
+    local r = launcher.service and launcher.service("gameDir", "list", {}) or nil
+    local its = (type(r) == "table" and r.ok and type(r.items) == "table") and r.items or {}
+    local m = its[tonumber(gd)]
+    if m and type(m.name) == "string" and m.name ~= "" then
+      launcher.service("gameDir", "set", { name = m.name })
+    end
     refreshGameDirectory()
     return
   end
-  local ds = id:match("^dirSel:(%d+)$")
+  local ds = id:match("^dirSlot_(%d+)$")
   if ds then
     local r = launcher.service and launcher.service("gameDir", "list", {}) or nil
     local its = (type(r) == "table" and r.ok and type(r.items) == "table") and r.items or {}
@@ -1983,8 +1988,8 @@ function onClick(id)
     launcher.service("multiplayer", "connect", { index = tonumber(mpIdx) })
     return
   end
-  -- 设置子页条目点击（占位：可扩展为弹窗或二级页）
-  local subToken, subIdx = id:match("^subRow:([^:]+):(%d+_%d+)$")
+  -- 设置子页条目点击（占位：可扩展为弹窗或二级页）。节点 id = sub{token}r{gi}_{ri}
+  local subToken, subIdx = id:match("^sub([^%d]+)r(%d+_%d+)$")
   if subToken then
     launcher.view("dlProgress"):setVisible(true)
     launcher.view("dlProgressLabel"):setText("设置项 " .. subToken .. "/" .. subIdx .. " 待实现…")
