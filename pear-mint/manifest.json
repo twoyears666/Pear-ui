@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "id": "pear-mint",
+  "name": "竹影薄荷",
+  "author": "Pear",
+  "version": "0.1.0-beta",
+  "entry": "main.lua",
+  "colors": "colors.json"
+}
