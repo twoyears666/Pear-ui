@@ -1,0 +1,39 @@
+{
+  "topbar": "#3E6B4F",
+  "pageFrom": "#EAF3EA",
+  "pageTo": "#D7E8D9",
+  "card": "#FFFFFF",
+  "cardBorder": "#CFE0CF",
+  "cardText": "#2E3D31",
+  "subText": "#8FA08F",
+  "white": "#FFFFFF",
+  "transparent": "#00000000",
+
+  "background_start": "#EAF3EA",
+  "background_end": "#D7E8D9",
+  "background_card": "#FFFFFF",
+  "background_gradient": { "from": "#EAF3EA", "to": "#D7E8D9" },
+
+  "accent": "#4E8358",
+  "accentBorder": "#4E8358",
+  "hover": "#E7F2E7",
+  "avatarBg": "#E6EFE3",
+  "avatarLine": "#B8CFB6",
+  "danger": "#C6594C",
+  "success": "#4C9A62",
+  "warningBg": "#F2F6E0",
+  "faintBlue": "#E6F1E4",
+  "fieldBorder": "#C6D8C6",
+
+  "brandGreen": "#4C9A62",
+  "brandOrange": "#C98A3D",
+  "brandPurple": "#7E78A8",
+  "brandPink": "#C0768E",
+  "brandCyan": "#3C9AA8",
+
+  "background": "#EAF3EA",
+  "surface": "#FFFFFF",
+  "textPrimary": "#2E3D31",
+  "textSecondary": "#8FA08F",
+  "border": "#CFE0CF"
+}
