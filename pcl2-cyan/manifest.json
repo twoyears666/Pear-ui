@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "id": "pcl2-cyan",
+  "name": "PCL 青芽浅色",
+  "author": "Pear",
+  "version": "0.1.0-beta",
+  "entry": "main.lua",
+  "colors": "colors.json"
+}
