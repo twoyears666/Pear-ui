@@ -15,7 +15,7 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.21.0-beta" }
+  return { name = "PCL 浅色", version = "1.22.0-beta" }
 end
 
 local C = {
@@ -578,10 +578,9 @@ local flatVersions = {}
 dlLevel = "groups"
 -- 分组展开状态：groupkey → bool（下载页首屏分组列表内联展开）
 dlOpenGroup = {}
--- 分组分页当前页：groupkey → 页码（可无限向后翻，无数量上限）
-dlGroupPage = {}
--- 每个版本分组展开时每页展示的版本行数（分页复用同一批槽位，可访问任意数量的版本）
-local DLG_PAGE = 8
+-- 已把该组全部版本行追加进列表容器的分组：groupkey → true（只追加一次，折叠/展开复用；
+-- 原版版本走引擎滚动完整列表，无数量上限，无需分页）
+dlGroupAppended = {}
 
 -- 版本行点击后打开详情页：填入所选版本信息并保持当前页高亮为「下载」。
 local function openDetailFor(cid, idx)
@@ -671,37 +670,46 @@ local function refreshInstallPanel()
   end
 end
 
--- 下载页首屏版本分组列表刷新：按 dlOpenGroup 展开分组，dlGroupPage 分页展示全部版本
+-- 下载页版本分组内单个版本行（原版版本完整列表，由 append 动态挂入滚动容器）
+local function dlGrpVersionRow(gkey, j, it)
+  return ui.row { id = "dlGrpVer_" .. gkey .. "_" .. j, width = "100%", height = "6.5vh",
+    background = C.card, corner = "0", border = { width = "0", color = C.cardBorder },
+    hoverColor = C.hover, crossAlign = "center", spacing = "1.2vh",
+    padding = { left = "1.6vh", right = "1.6vh" }, action = "dlGrpVer:" .. gkey .. ":" .. j,
+    children = {
+      ui.image { icon = "sf:cube.fill", size = "2.6vh", style = { tint = C.accent } },
+      ui.column { weight = 1, crossAlign = "stretch", spacing = "0.5vh", children = {
+        ui.text { id = "dlGrpVer_" .. gkey .. "_" .. j .. "_name", text = it and it.id or "",
+          width = "100%", style = { font = "2.3vh", color = C.dark } },
+        ui.text { id = "dlGrpVer_" .. gkey .. "_" .. j .. "_date",
+          text = it and (it.date or "") or "", width = "100%",
+          style = { font = "1.9vh", color = C.mid } },
+      } },
+      chevron(),
+    } }
+end
+
+-- 下载页首屏版本分组列表刷新：按 dlOpenGroup 展开分组。
+-- 首次展开时把该组的全部版本行一次性追加进列表容器（dlGrpVersionRow × N，引擎滚动完整列表），
+-- 此后折叠/展开只切换列表容器可见性；版本数量无上限（mod 等其它下载内容不走此路径）。
 local function refreshDownloadGroups()
   for _, g in ipairs(CONFIG.download.versionGroups or {}) do
     local key = g.key
     local open = dlOpenGroup[key] == true
-    local rows = dlGroups[key] or {}
-    local total = #rows
-    local pages = math.max(1, math.ceil(total / DLG_PAGE))
-    local page = dlGroupPage[key] or 1
-    if page > pages then page = pages dlGroupPage[key] = page end
-    local start = (page - 1) * DLG_PAGE
-    for j = 1, DLG_PAGE do
-      local it = rows[start + j]
-      local rowV = launcher.view("dlGrpVer_" .. key .. "_" .. j)
-      if rowV then rowV:setVisible(open and it ~= nil) end
-      local nameV = launcher.view("dlGrpVer_" .. key .. "_" .. j .. "_name")
-      if nameV then nameV:setText(it and it.id or "") end
-      local dateV = launcher.view("dlGrpVer_" .. key .. "_" .. j .. "_date")
-      if dateV then dateV:setText(it and (it.date or "") or "") end
+    if open and not dlGroupAppended[key] then
+      local rows = dlGroups[key] or {}
+      local nodes = {}
+      for j = 1, #rows do nodes[#nodes + 1] = dlGrpVersionRow(key, j, rows[j]) end
+      local listV = launcher.view("dlGrpList_" .. key)
+      if listV and #nodes > 0 then
+        listV:append(nodes)
+        dlGroupAppended[key] = true
+      end
     end
+    local listV = launcher.view("dlGrpList_" .. key)
+    if listV then listV:setVisible(open) end
     local hV = launcher.view("dlGh_" .. key)
     if hV then hV:setStyle({ background = open and C.hover or C.card }) end
-    -- 分页导航：多于一页才显示
-    local navV = launcher.view("dlGrpNav_" .. key .. "_row")
-    if navV then navV:setVisible(open and pages > 1) end
-    local pageV = launcher.view("dlGrpPage_" .. key)
-    if pageV then pageV:setText(page .. " / " .. pages) end
-    local pv = launcher.view("dlGrpPrev_" .. key .. "_row")
-    if pv then pv:setEnabled(page > 1) end
-    local nv = launcher.view("dlGrpNext_" .. key .. "_row")
-    if nv then nv:setEnabled(page < pages) end
   end
 end
 
@@ -723,24 +731,9 @@ local function buildDownloadPage()
   local maxR = D.maxVersionRows or 12
   local compN = #(D.loaders or {})
 
-  -- 首屏「版本分组」列表：分组行（dlGh_<key>）+ 内联版本行（dlGrpVer_<key>_<j>），贴合零间距
-  local function grpVersionRow(gkey, j)
-    return ui.row { id = "dlGrpVer_" .. gkey .. "_" .. j, width = "100%", height = "6.5vh",
-      background = C.card, corner = "0", border = { width = "0", color = C.cardBorder },
-      hoverColor = C.hover, crossAlign = "center", spacing = "1.2vh",
-      padding = { left = "1.6vh", right = "1.6vh" }, action = "dlGrpVer:" .. gkey .. ":" .. j,
-      visible = false,
-      children = {
-        ui.image { icon = "sf:cube.fill", size = "2.6vh", style = { tint = C.accent } },
-        ui.column { weight = 1, crossAlign = "stretch", spacing = "0.5vh", children = {
-          ui.text { id = "dlGrpVer_" .. gkey .. "_" .. j .. "_name", text = "", width = "100%",
-            style = { font = "2.3vh", color = C.dark } },
-          ui.text { id = "dlGrpVer_" .. gkey .. "_" .. j .. "_date", text = "", width = "100%",
-            style = { font = "1.9vh", color = C.mid } },
-        } },
-        chevron(),
-      } }
-  end
+  -- 首屏「版本分组」列表：分组行（dlGh_<key>）+ 内联版本列表容器（dlGrpList_<key>）。
+  -- 列表容器初始为空；展开时由 refreshDownloadGroups 用 listV:append(dlGrpVersionRow × N)
+  -- 一次性注入该组全部版本（版本行构建见模块级 dlGrpVersionRow），整个页面随内容滚动。
   local function grpCard()
     local rows = {}
     for _, g in ipairs(D.versionGroups or {}) do
@@ -754,24 +747,8 @@ local function buildDownloadPage()
           ui.text { text = g.name, weight = 1, style = { font = "2.6vh", color = C.dark } },
           ui.text { text = "›", style = { font = "3vh", color = C.mid } },
         } }
-      local vrs = {}
-      for j = 1, DLG_PAGE do vrs[#vrs + 1] = grpVersionRow(g.key, j) end
       rows[#rows + 1] = ui.column { id = "dlGrpList_" .. g.key, width = "100%",
-        crossAlign = "stretch", spacing = "0", children = vrs }
-      -- 分页导航行：上一页 / 页码 / 下一页
-      rows[#rows + 1] = ui.row { id = "dlGrpNav_" .. g.key .. "_row", width = "100%",
-        height = "6.5vh", justify = "center", crossAlign = "center", spacing = "2vh",
-        padding = { left = "1.6vh", right = "1.6vh" },
-        children = {
-          ui.button { id = "dlGrpPrev_" .. g.key .. "_row", label = "‹ 上一页", width = "14vh",
-            height = "4.6vh", background = C.faintBlue, corner = "0.8vh",
-            action = "dlGrpPrev:" .. g.key, style = { font = "2.2vh", tint = C.accent } },
-          ui.text { id = "dlGrpPage_" .. g.key, text = "1 / 1", width = "10vh",
-            style = { font = "2.2vh", color = C.mid, align = "center" } },
-          ui.button { id = "dlGrpNext_" .. g.key .. "_row", label = "下一页 ›", width = "14vh",
-            height = "4.6vh", background = C.accent, corner = "0.8vh",
-            action = "dlGrpNext:" .. g.key, style = { font = "2.2vh", tint = C.white } },
-        } }
+        crossAlign = "stretch", spacing = "0", children = {} }
     end
     return ui.column { id = "dlGroupsCard", width = "70%", background = C.card, border = BORDER,
       corner = "1vh", shadow = SHADOW, padding = "0", overflow = "hidden",
@@ -2172,23 +2149,7 @@ function onClick(id)
   local dgh = id:match("^dlGh_(.+)$")
   if dgh then
     dlOpenGroup[dgh] = not (dlOpenGroup[dgh] == true)
-    dlGroupPage[dgh] = 1 -- 重新展开回到第一页
     refreshDownloadGroups()
-    return
-  end
-  -- 分组分页：上一页 / 下一页（节点 id 为下划线：dlGrpPrev_<key>_row）
-  local gPrev = id:match("^dlGrpPrev_(.+)_row$")
-  if gPrev then
-    local p = dlGroupPage[gPrev] or 1
-    if p > 1 then dlGroupPage[gPrev] = p - 1 refreshDownloadGroups() end
-    return
-  end
-  local gNext = id:match("^dlGrpNext_(.+)_row$")
-  if gNext then
-    local rows = dlGroups[gNext] or {}
-    local pages = math.max(1, math.ceil(#rows / DLG_PAGE))
-    local p = dlGroupPage[gNext] or 1
-    if p < pages then dlGroupPage[gNext] = p + 1 refreshDownloadGroups() end
     return
   end
   -- 引擎派发的版本行节点 id 为下划线形式：dlGrpVer_<key>_<j>（key 可能含下划线，如 april_fools）
