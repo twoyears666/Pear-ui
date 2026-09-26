@@ -3,7 +3,7 @@
   "id": "sage-isle",
   "name": "山野青绿",
   "author": "Pear",
-  "version": "0.1.0-beta",
+  "version": "0.1.1-beta",
   "entry": "main.lua",
   "colors": "colors.json"
 }

@@ -11,7 +11,7 @@
 --   页面：内容区 content 挂纯 Lua 页子树，页 token ∈ CONFIG.pages。
 
 function describe()
-  return { name = "山野青绿", version = "0.1.0-beta" }
+  return { name = "山野青绿", version = "0.1.1-beta" }
 end
 
 local C = {
@@ -183,7 +183,7 @@ local function chevron()
 end
 
 local function bottomTab(t)
-  return ui.button { id = t.id, action = t.action, width = "auto", justify = "center",
+  return ui.row { id = t.id, action = t.action, width = "auto", justify = "center",
     crossAlign = "center", spacing = "0.6vh", padding = { left = "2vh", right = "2vh", top = "0.6vh", bottom = "0.6vh" },
     corner = "pill", background = C.transparent, children = {
       ui.image { icon = t.icon, size = "2.6vh", style = { tint = C.white } },
@@ -210,7 +210,7 @@ local function buildHomePage()
     ui.row { width = "100%", crossAlign = "center", spacing = "1.5vh", children = {
       ui.input { id = "launchVerIn", width = "60%", height = "6.5vh", placeholder = CONFIG.home.brand,
         corner = "1vh", border = BORDER, background = C.card, textColor = C.dark, placeholderColor = C.mid },
-      ui.button { id = "launchPrimary", action = "launchPrimary", height = "6.5vh", width = "34%",
+      ui.row { id = "launchPrimary", action = "launchPrimary", height = "6.5vh", width = "34%",
         crossAlign = "center", justify = "center", background = C.accent, corner = "1vh",
         hoverColor = C.accentBorder, children = {
           ui.image { icon = "sf:play.fill", size = "2.8vh", style = { tint = C.white } },
@@ -229,7 +229,7 @@ local function buildHomePage()
     (function()
       local cells = {}
       for _, e in ipairs(entries) do
-        cells[#cells + 1] = ui.button { id = e.id, action = e.action, height = "11vh", width = "100%",
+        cells[#cells + 1] = ui.row { id = e.id, action = e.action, height = "11vh", width = "100%",
           crossAlign = "center", spacing = "1.6vh", corner = "1.2vh", padding = "1.5vh",
           background = C.card, border = BORDER, shadow = SHADOW, hoverColor = C.hover, children = {
             ui.image { icon = e.icon, size = "5.5vh", corner = "1.2vh", background = { from = e.tint, to = e.tint, angle = 0 },
@@ -322,7 +322,7 @@ local function buildInstallPreview()
       corner = "1vh", border = BORDER, background = C.card, textColor = C.dark, placeholderColor = C.mid },
     ui.row { height = "7vh", crossAlign = "center", justify = "end", spacing = "1.5vh", children = {
       ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "2vh", color = C.mid } },
-      ui.button { id = "insStart", action = "insStart", corner = "pill",
+      ui.row { id = "insStart", action = "insStart", corner = "pill",
         padding = { left = "3vh", right = "3vh", top = "1vh", bottom = "1vh" },
         background = C.accent, hoverColor = C.accentBorder, children = {
           ui.text { text = "开始安装", style = { font = "2.5vh", weight = "bold", color = C.white } },
@@ -391,10 +391,10 @@ local function buildDownloadPage()
     ui.row { id = "dlCommCtl", width = "100%", crossAlign = "center", spacing = "1.2vh", children = {
       sectionTitle("社区资源"),
       ui.spacer { weight = 1 },
-      ui.button { id = "dlCommKeyword", action = "dlCommKeyword", corner = "pill",
+      ui.row { id = "dlCommKeyword", action = "dlCommKeyword", corner = "pill",
         padding = { left = "2.5vh", right = "2.5vh", top = "0.8vh", bottom = "0.8vh" },
         background = C.card, border = BORDER, children = { ui.text { text = "关键词", style = { font = "2.4vh", color = C.dark } } } },
-      ui.button { id = "dlCommSearch", action = "dlCommSearch", corner = "pill",
+      ui.row { id = "dlCommSearch", action = "dlCommSearch", corner = "pill",
         padding = { left = "2.5vh", right = "2.5vh", top = "0.8vh", bottom = "0.8vh" },
         background = C.accent, children = { ui.text { text = "搜索", style = { font = "2.4vh", weight = "bold", color = C.white } } } },
     } },
@@ -431,20 +431,20 @@ local function buildMultiPage()
         ui.text { text = "联机大厅", width = "100%", style = { font = "3vh", weight = "bold", color = C.dark } },
         ui.row { height = "6.5vh", crossAlign = "center", spacing = "1.5vh", children = {
           ui.text { text = "模式", style = { font = "2.4vh", color = C.mid } },
-          ui.button { id = "segM_1", action = "segM:1", corner = "pill",
+          ui.row { id = "segM_1", action = "segM:1", corner = "pill",
             padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
             background = C.accent, children = { ui.text { text = "局域网", style = { font = "2.3vh", weight = "bold", color = C.white } } } },
-          ui.button { id = "segM_2", action = "segM:2", corner = "pill",
+          ui.row { id = "segM_2", action = "segM:2", corner = "pill",
             padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
             background = C.card, border = BORDER, children = { ui.text { text = "在线", style = { font = "2.3vh", color = C.dark } } } },
         } },
         ui.text { id = "mpStatus", text = "选择模式后创建或加入房间。",
           width = "100%", style = { font = "2.2vh", color = C.mid } },
         ui.row { height = "7vh", crossAlign = "center", spacing = "1.5vh", children = {
-          ui.button { id = "mpCreate", action = "mpCreate", corner = "pill",
+          ui.row { id = "mpCreate", action = "mpCreate", corner = "pill",
             padding = { left = "3vh", right = "3vh", top = "0.8vh", bottom = "0.8vh" },
             background = C.accent, children = { ui.text { text = "创建房间", style = { font = "2.4vh", weight = "bold", color = C.white } } } },
-          ui.button { id = "mpJoin",  action = "mpJoin",  corner = "pill",
+          ui.row { id = "mpJoin",  action = "mpJoin",  corner = "pill",
             padding = { left = "3vh", right = "3vh", top = "0.8vh", bottom = "0.8vh" },
             background = C.card, border = BORDER, children = { ui.text { text = "加入房间", style = { font = "2.4vh", color = C.dark } } } },
         } },
@@ -457,21 +457,21 @@ local function settingsRow(s)
   local id = "set_" .. s.key
   local right
   if s.type == "toggle" or s.type == "switch" then
-    right = ui.button { id = id .. "_sw", action = "set_toggle:" .. s.key, height = "3.4vh", width = "7vh",
+    right = ui.row { id = id .. "_sw", action = "set_toggle:" .. s.key, height = "3.4vh", width = "7vh",
       corner = "pill", background = C.accent, children = {
         ui.row { height = "100%", justify = "end", crossAlign = "center",
           padding = { left = "0.6vh", right = "0.6vh", top = "0.4vh", bottom = "0.4vh" },
           children = { ui.row { height = "2.6vh", width = "2.6vh", corner = "pill", background = C.white } } },
       } }
   elseif s.type == "select" then
-    right = ui.button { id = id .. "_v", action = "set_select:" .. s.key, corner = "pill",
+    right = ui.row { id = id .. "_v", action = "set_select:" .. s.key, corner = "pill",
       padding = { left = "2vh", right = "2vh", top = "0.6vh", bottom = "0.6vh" },
       background = C.card, border = BORDER_A, children = {
         ui.text { id = id .. "_val", text = (s.options and s.options[1]) or "···",
           style = { font = "2.3vh", color = C.accent } },
       } }
   elseif s.type == "button" then
-    right = ui.button { id = id .. "_btn", action = "set_button:" .. s.key, corner = "pill",
+    right = ui.row { id = id .. "_btn", action = "set_button:" .. s.key, corner = "pill",
       padding = { left = "2.5vh", right = "2.5vh", top = "0.6vh", bottom = "0.6vh" },
       background = C.card, border = BORDER_A, children = {
         ui.text { text = "执行", style = { font = "2.3vh", color = C.accent } },
@@ -499,7 +499,7 @@ local function buildSettingsPage()
     (function()
       local cats = {}
       for gi, g in ipairs(CONFIG.settingsGroups) do
-        cats[#cats + 1] = ui.button { id = "setCat_" .. g.id, action = "setCat_" .. g.id, corner = "pill",
+        cats[#cats + 1] = ui.row { id = "setCat_" .. g.id, action = "setCat_" .. g.id, corner = "pill",
           padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
           background = (gi == 1) and C.accent or C.card, border = BORDER, children = {
             ui.text { text = (CONFIG.settingsGroupNames[gi] or g.label),
@@ -603,7 +603,7 @@ local function buildVersionDetailPage()
         (function()
           local arr = {}
           for li, lname in ipairs(CONFIG.download.loaders) do
-            arr[#arr + 1] = ui.button { id = "vdL_" .. li, action = "vdL:" .. li, corner = "pill",
+            arr[#arr + 1] = ui.row { id = "vdL_" .. li, action = "vdL:" .. li, corner = "pill",
               padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
               background = (li == 1) and C.accent or C.card, border = BORDER_A, children = {
                 ui.text { text = lname, style = { font = "2.3vh", color = (li == 1) and C.white or C.dark } },
@@ -611,7 +611,7 @@ local function buildVersionDetailPage()
           end
           return ui.row { width = "100%", spacing = "1.2vh", children = arr }
         end)(),
-        ui.button { id = "vdInstall", action = "vdInstall", corner = "pill", alignSelf = "end",
+        ui.row { id = "vdInstall", action = "vdInstall", corner = "pill", alignSelf = "end",
           padding = { left = "4vh", right = "4vh", top = "1vh", bottom = "1vh" },
           background = C.accent, children = {
             ui.text { text = "下载并安装", style = { font = "2.5vh", weight = "bold", color = C.white } },
@@ -627,7 +627,7 @@ local function buildVersionManagerPage()
         ui.row { width = "100%", height = "7vh", crossAlign = "center", children = {
           ui.text { text = CONFIG.versionManager.title, weight = 1,
             style = { font = "3vh", weight = "bold", color = C.dark } },
-          ui.button { id = "vmAdd", action = CONFIG.versionManager.addAction, corner = "pill",
+          ui.row { id = "vmAdd", action = CONFIG.versionManager.addAction, corner = "pill",
             padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
             background = C.accent, children = { ui.text { text = "添加", style = { font = "2.3vh", weight = "bold", color = C.white } } } },
         } },
@@ -643,7 +643,7 @@ local function buildAccountManagerPage()
         ui.row { width = "100%", height = "7vh", crossAlign = "center", children = {
           ui.text { text = CONFIG.accountManager.title, weight = 1,
             style = { font = "3vh", weight = "bold", color = C.dark } },
-          ui.button { id = "amAdd", action = CONFIG.accountManager.addAction, corner = "pill",
+          ui.row { id = "amAdd", action = CONFIG.accountManager.addAction, corner = "pill",
             padding = { left = "2.5vh", right = "2.5vh", top = "0.7vh", bottom = "0.7vh" },
             background = C.accent, children = { ui.text { text = "添加", style = { font = "2.3vh", weight = "bold", color = C.white } } } },
         } },
