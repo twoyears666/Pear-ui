@@ -1,5 +1,7 @@
 {
   "topbar": "#0A5FC4",
+  "topbarFrom": "#2E7BDA",
+  "topbarTo": "#0A5FC4",
   "pageFrom": "#E3EEF9",
   "pageTo": "#D5E5F5",
   "card": "#FFFFFF",

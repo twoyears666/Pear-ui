@@ -15,11 +15,13 @@
 --   pageHome / pageDownload / pageMulti / pageSettings / pageMore / pageVersionSettings
 
 function describe()
-  return { name = "PCL 浅色", version = "1.22.0-beta" }
+  return { name = "PCL 浅色", version = "1.23.0-beta" }
 end
 
 local C = {
   topbar      = "$color:topbar",              -- 顶栏蓝 #0A5FC4
+  topbarFrom  = "$color:topbarFrom",          -- 顶栏渐变起点（较亮的蓝）
+  topbarTo    = "$color:topbarTo",            -- 顶栏渐变终点 = 主题蓝 #0A5FC4
   pageFrom    = "$color:pageFrom",            -- 渐变左上 #E3EEF9
   pageTo      = "$color:pageTo",              -- 渐变右下 #D5E5F5
   bg          = "$color:background_start",    -- 页面底色起点 #E3EEF9（渐变同 background_gradient）
@@ -1545,7 +1547,7 @@ end
 local function sidebarItem(id, icon, label, action, dotId)
   local kids = {}
   if icon then
-    kids[#kids + 1] = ui.image { icon = icon, size = "3vh", corner = "pill",
+    kids[#kids + 1] = ui.image { id = id .. "Icon", icon = icon, size = "3vh", corner = "pill",
       background = C.faintBlue, style = { tint = C.accent } }
   end
   if dotId then
@@ -1553,7 +1555,7 @@ local function sidebarItem(id, icon, label, action, dotId)
       style = { tint = C.mid } }
   end
   kids[#kids + 1] = ui.column { weight = 1, crossAlign = "stretch", children = {
-    ui.text { text = label, width = "100%", style = { font = "2.3vh", color = C.dark } },
+    ui.text { id = id .. "Txt", text = label, width = "100%", style = { font = "2.3vh", color = C.dark } },
   } }
   return ui.row {
     id = id, height = "6vh", width = "100%", background = C.card, corner = "0.9vh",
@@ -1561,6 +1563,25 @@ local function sidebarItem(id, icon, label, action, dotId)
     padding = { left = "1.4vh", right = "1.4vh" },
     children = kids,
   }
+end
+
+-- 侧栏项选中态：PCL2 左侧目录选中项为「主题蓝实底 + 白字」，未选中为白底深字。
+-- 依赖 sidebarItem 为图标/文字生成的 `<id>Icon` / `<id>Txt` 子节点 id。
+local function applySidebarSel(id, sel)
+  local row = launcher.view(id)
+  if row then
+    row:setStyle(sel
+      and { background = C.accent, borderColor = C.accentBorder }
+      or  { background = C.card, borderColor = C.cardBorder })
+  end
+  local txt = launcher.view(id .. "Txt")
+  if txt then txt:setTextColor(sel and C.white or C.dark) end
+  local ic = launcher.view(id .. "Icon")
+  if ic then
+    ic:setStyle(sel
+      and { background = C.white, tint = C.accent }
+      or  { background = C.faintBlue, tint = C.accent })
+  end
 end
 
 -- 设置页左侧分类目录侧栏（仿 PCL PageSetupLeft；数据驱动 CONFIG.settingsGroups，恒非空）
@@ -1742,11 +1763,18 @@ function build(ui)
   return ui.column {
     id = "shell", crossAlign = "stretch", spacing = 0,
     children = {
-      -- 顶栏：蓝通栏，页签选中态套白底全圆药丸（不做绝对定位游标）
-      ui.row { id = "titlebar", height = "8.5vh", background = C.topbar, crossAlign = "center",
-        padding = { left = "2vh", right = "1.5vh" },
+      -- 顶栏：蓝色渐变通栏（PCL2 顶栏为渐变而非纯色），页签选中态套白底全圆药丸
+      ui.row { id = "titlebar", height = "8.5vh",
+        background = { from = C.topbarFrom, to = C.topbarTo, angle = 90 }, crossAlign = "center",
+        padding = { left = "1.4vh", right = "1.5vh" },
         children = {
-          ui.text { id = "logo", text = "PCL", width = "10vh", style = { font = "3.2vh", weight = "bold", color = C.white } },
+          -- PCL II 徽标：白底圆角方块 + 主题蓝字，右侧「II」
+          ui.row { id = "logoBadge", corner = "0.7vh", background = C.white, crossAlign = "center",
+            padding = { left = "0.9vh", right = "0.9vh", top = "0.35vh", bottom = "0.35vh" },
+            children = {
+              ui.text { id = "logo", text = "PCL", style = { font = "2.7vh", weight = "bold", color = C.topbarTo } },
+            } },
+          ui.text { id = "logoII", text = "II", style = { font = "2.3vh", weight = "bold", color = C.white } },
           ui.spacer { weight = 1 },
           ui.row { id = "tabs", spacing = "5vh", crossAlign = "center",
             children = (function()
@@ -1900,8 +1928,7 @@ end
 local function refreshSettingsSidebar()
   for _, g in ipairs(CONFIG.settingsGroups) do
     local sel = (g.id == setSelCat)
-    local it = launcher.view("setCat_" .. g.id)
-    if it then it:setStyle(sel and { background = C.hover } or { background = C.card }) end
+    applySidebarSel("setCat_" .. g.id, sel)
     local sec = launcher.view("setSec_" .. g.id)
     if sec then sec:setVisible(sel) end
   end
@@ -1910,9 +1937,7 @@ end
 local function refreshVersionSettingsSidebar()
   for _, c in ipairs(VS_CATS) do
     local sel = (c.token == vsSelCat)
-    launcher.view("vsCat_" .. c.token):setStyle(sel
-      and { background = C.hover }
-      or  { background = C.card })
+    applySidebarSel("vsCat_" .. c.token, sel)
   end
 end
 
@@ -1944,9 +1969,7 @@ end
 local function refreshMoreSidebar()
   for _, g in ipairs(CONFIG.moreGroups) do
     local sel = (g.name == moreSelCat)
-    launcher.view("moreCat_" .. g.name):setStyle(sel
-      and { background = C.hover }
-      or  { background = C.card })
+    applySidebarSel("moreCat_" .. g.name, sel)
   end
 end
 
