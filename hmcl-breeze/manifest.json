@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "id": "hmcl-breeze",
+  "name": "清风蓝调",
+  "author": "Pear",
+  "version": "0.1.0-beta",
+  "entry": "main.lua",
+  "colors": "colors.json"
+}
