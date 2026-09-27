@@ -1,9 +1,11 @@
 -- Pear 启动器 · HMCL 清风蓝调 UI 包 —— v0.1.0-beta
 --
 -- 视觉仿 HMCL（Hello Minecraft! Launcher）：
---   · 最左侧一条窄的纯图标导航栏（白底 + 选中浅蓝圆角高亮 + 蓝色图标）
+--   · 顶栏为品牌色通栏（#4E6FBE）+ 白色标题/图标，右侧 ? / − / ✕ 窗口按钮
+--   · 左侧导航栏为「图标 + 文字」条目，按「游戏 / 通用」分组，
+--     分组标题呈「小字 + 右侧细分隔线」样式，选中项浅蓝圆角高亮
 --   · 主区大幅 hero 渐变横幅（#4C7FC4 → #8FB6DE，45°）
---   · 横幅右下角悬浮半透明白色圆角启动面板（头像 + 账号名/类型 + 蓝色药丸「启动游戏」）
+--   · 横幅右下角悬浮白色圆角启动面板（头像 + 账号名/类型 + 品牌色「启动游戏」按钮）
 --   · 其余为白色卡片 + 浅灰蓝描边(#E0E6EF) + 圆角 + 轻阴影，区块标题用 accent 蓝
 --
 -- 契约（引擎通用，零特例）：
@@ -58,18 +60,29 @@ local SHADOW    = { blur = "0.35vh", opacity = 0.10, x = 0, y = "0.16vh" }
 local HERO_FROM = "$color:heroFrom"
 local HERO_TO   = "$color:heroTo"
 
--- ============ 窄图标导航栏（HMCL 最左侧竖排纯图标）============
-local RAIL = {
-  { id = "navHome",            icon = "sf:house.fill",                  action = "open:home",             page = "home" },
-  { id = "navDownload",        icon = "sf:arrow.down.circle.fill",      action = "open:download",         page = "download" },
-  { id = "navMulti",           icon = "sf:wifi",                        action = "open:multiplayer",      page = "multi" },
-  { id = "navVersionManager",  icon = "sf:square.grid.3x3.fill",        action = "open:versionManager",   page = "versionManager" },
-  { id = "navGameDirectory",   icon = "sf:folder.fill",                 action = "open:gameDirectory",    page = "gameDirectory" },
-  { id = "navAccountManager",  icon = "sf:person.crop.circle.fill",     action = "open:accountManager",   page = "accountManager" },
-  { id = "navVersionSettings", icon = "sf:wrench.and.screwdriver.fill", action = "open:version_settings", page = "version_settings" },
-  { id = "navSettings",        icon = "sf:gearshape.fill",              action = "open:settings",         page = "settings" },
-  { id = "navMore",            icon = "sf:ellipsis.circle.fill",        action = "open:more",             page = "more" },
+-- ============ 左侧导航栏（HMCL 式：图标 + 文字 + 分组标题）============
+local RAIL_SECTIONS = {
+  { items = {
+      { id = "navHome",     icon = "sf:house.fill",             label = "首页",     action = "open:home",         page = "home" },
+      { id = "navDownload", icon = "sf:arrow.down.circle.fill", label = "下载",     action = "open:download",     page = "download" },
+      { id = "navMulti",    icon = "sf:wifi",                   label = "多人联机", action = "open:multiplayer",  page = "multi" },
+    } },
+  { name = "游戏", items = {
+      { id = "navVersionManager",  icon = "sf:square.grid.3x3.fill",        label = "版本管理", action = "open:versionManager",   page = "versionManager" },
+      { id = "navVersionSettings", icon = "sf:wrench.and.screwdriver.fill", label = "版本设置", action = "open:version_settings", page = "version_settings" },
+      { id = "navGameDirectory",   icon = "sf:folder.fill",                 label = "游戏目录", action = "open:gameDirectory",    page = "gameDirectory" },
+    } },
+  { name = "通用", items = {
+      { id = "navAccountManager", icon = "sf:person.crop.circle.fill", label = "账号管理", action = "open:accountManager", page = "accountManager" },
+      { id = "navSettings",       icon = "sf:gearshape.fill",          label = "设置",     action = "open:settings",       page = "settings" },
+      { id = "navMore",           icon = "sf:ellipsis.circle.fill",    label = "更多",     action = "open:more",           page = "more" },
+    } },
 }
+
+local RAIL = {}
+for _, sec in ipairs(RAIL_SECTIONS) do
+  for _, it in ipairs(sec.items) do RAIL[#RAIL + 1] = it end
+end
 
 local PAGE_RAIL = {}
 for _, r in ipairs(RAIL) do PAGE_RAIL[r.page] = r.id end
@@ -226,10 +239,10 @@ local function listRow(spec)
     } }
 end
 
--- 药丸按钮（主/次）
-local function pillButton(id, label, primary, action)
-  return ui.row { id = id, action = action or id, corner = "pill",
-    padding = { left = "2.8vh", right = "2.8vh", top = "0.8vh", bottom = "0.8vh" },
+-- HMCL 填充式操作按钮（小圆角矩形，主按钮品牌色底白字）
+local function actionButton(id, label, primary, action)
+  return ui.row { id = id, action = action or id, corner = "1.2vh",
+    padding = { left = "2.8vh", right = "2.8vh", top = "0.9vh", bottom = "0.9vh" },
     background = primary and C.accent or C.card,
     border = primary and BORDER or BORDER_A,
     hoverColor = primary and C.accentBorder or C.hover,
@@ -238,9 +251,14 @@ end
 
 local function railItem(r)
   return ui.row { id = r.id, action = r.action, width = "100%", height = "6vh",
-    crossAlign = "center", justify = "center", corner = "1.4vh",
-    background = C.transparent, hoverColor = C.hover,
-    children = { ui.image { id = r.id .. "_ico", icon = r.icon, size = "3.4vh", style = { tint = C.mid } } } }
+    crossAlign = "center", spacing = "1.4vh",
+    padding = { left = "1.2vh", right = "1.2vh" },
+    corner = "1.2vh", background = C.transparent, hoverColor = C.hover,
+    children = {
+      ui.image { id = r.id .. "_ico", icon = r.icon, size = "3.2vh", style = { tint = C.mid } },
+      ui.text { id = r.id .. "_label", text = r.label, weight = 1,
+        style = { font = "2.4vh", color = C.dark } },
+    } }
 end
 
 -- ============ 设置行（数据驱动，id 剥离后缀匹配）============
@@ -295,7 +313,7 @@ local function buildLaunchPanel()
         } },
       } },
       ui.row { id = "launchPrimary", action = "launch", width = "100%", height = "6.6vh",
-        corner = "pill", background = C.accent, hoverColor = C.accentBorder,
+        corner = "1.2vh", background = C.accent, hoverColor = C.accentBorder,
         crossAlign = "center", justify = "center", spacing = "1vh",
         children = {
           ui.image { icon = "sf:play.fill", size = "2.8vh", style = { tint = C.white } },
@@ -515,7 +533,7 @@ local function buildInstallPreview()
       corner = "1vh", border = BORDER, background = C.card, textColor = C.dark, placeholderColor = C.mid },
     ui.row { width = "100%", height = "7vh", crossAlign = "center", justify = "end", spacing = "1.5vh", children = {
       ui.text { text = CONFIG.download.installHint, weight = 1, style = { font = "1.9vh", color = C.mid } },
-      ui.row { id = "insStart", action = "insStart", corner = "pill",
+      ui.row { id = "insStart", action = "insStart", corner = "1.2vh",
         padding = { left = "3vh", right = "3vh", top = "1vh", bottom = "1vh" },
         background = C.accent, hoverColor = C.accentBorder, children = {
           ui.text { text = "开始安装", style = { font = "2.5vh", weight = "bold", color = C.white } },
@@ -548,8 +566,8 @@ local function buildCommunityCard()
   return card("dlCommCard", {
     ui.row { width = "100%", crossAlign = "center", spacing = "1.2vh", children = {
       ui.text { text = "社区资源搜索", weight = 1, style = { font = "2.7vh", weight = "bold", color = C.accent } },
-      pillButton("dlCommKeyword", "关键词", false),
-      pillButton("dlCommSearch", "搜索", true),
+      actionButton("dlCommKeyword", "关键词", false),
+      actionButton("dlCommSearch", "搜索", true),
     } },
     ui.text { id = "dlCommStatus", text = CONFIG.download.searchStatusPreset, width = "100%",
       style = { font = "2.1vh", color = C.mid } },
@@ -594,8 +612,8 @@ local function buildMultiPage()
         ui.text { id = "mpStatus", text = CONFIG.multi.preset, width = "100%",
           style = { font = "2.2vh", color = C.dark } },
         ui.row { width = "100%", height = "7vh", crossAlign = "center", spacing = "1.5vh", children = {
-          pillButton("mpCreate", "创建房间", true),
-          pillButton("mpJoin", "加入房间", false),
+          actionButton("mpCreate", "创建房间", true),
+          actionButton("mpJoin", "加入房间", false),
         } },
       }, { width = "94%" }),
     } }
@@ -708,7 +726,7 @@ local function buildVersionSettingsPage()
             ui.text { id = "vsName", text = "未选择版本", style = { font = "2.9vh", weight = "bold", color = C.dark } },
             ui.text { id = "vsMeta", text = "版本独立设置 · 与全局设置互不影响", style = { font = "2.1vh", color = C.mid } },
           } },
-          pillButton("vsOpenDir", "游戏目录", false),
+          actionButton("vsOpenDir", "游戏目录", false),
         } },
       }, { width = "94%" }),
       ui.row { id = "vsCatRow", width = "94%", spacing = "1.2vh", crossAlign = "center", children = chips },
@@ -731,7 +749,7 @@ local function buildVersionManagerPage()
   local kids = {
     ui.row { width = "100%", height = "7vh", crossAlign = "center", children = {
       ui.text { text = CONFIG.versionManager.title, weight = 1, style = { font = "3vh", weight = "bold", color = C.accent } },
-      pillButton("vmAdd", "添加", true, CONFIG.versionManager.addAction),
+      actionButton("vmAdd", "添加", true, CONFIG.versionManager.addAction),
     } },
   }
   for i = 1, 5 do
@@ -757,7 +775,7 @@ local function buildAccountManagerPage()
   local kids = {
     ui.row { width = "100%", height = "7vh", crossAlign = "center", children = {
       ui.text { text = CONFIG.accountManager.title, weight = 1, style = { font = "3vh", weight = "bold", color = C.accent } },
-      pillButton("amAdd", "添加", true, CONFIG.accountManager.addAction),
+      actionButton("amAdd", "添加", true, CONFIG.accountManager.addAction),
     } },
   }
   for i = 1, 4 do
@@ -786,7 +804,7 @@ local function buildGameDirectoryPage()
     ui.row { width = "100%", height = "6vh", crossAlign = "center", spacing = "1.2vh", children = {
       ui.input { id = "gdNameIn", weight = 1, height = "6vh", placeholder = CONFIG.gameDirectory.addPlaceholder,
         corner = "1vh", border = BORDER, background = C.card, textColor = C.dark, placeholderColor = C.mid },
-      pillButton("gdCreate", "新建", true),
+      actionButton("gdCreate", "新建", true),
     } },
   }
   for i = 1, 4 do
@@ -829,7 +847,7 @@ local function buildVersionDetailPage()
         ui.row { id = "vdLoaderRow", width = "100%", spacing = "1.2vh", crossAlign = "center", children = loaderBtns },
         ui.divider { height = "0.08vh", background = C.cardBorder },
         ui.row { width = "100%", justify = "end", children = {
-          ui.row { id = "vdInstall", action = "vdInstall", corner = "pill",
+          ui.row { id = "vdInstall", action = "vdInstall", corner = "1.2vh",
             padding = { left = "3.4vh", right = "3.4vh", top = "1vh", bottom = "1vh" },
             background = C.accent, hoverColor = C.accentBorder, children = {
               ui.text { text = "下载并安装", style = { font = "2.5vh", weight = "bold", color = C.white } },
@@ -854,30 +872,38 @@ function build(ui)
     buildVersionDetailPage(),
   }
 
-  local railKids = {
-    ui.text { id = "railBrand", text = "Pear", width = "100%",
-      style = { font = "1.7vh", weight = "bold", color = C.mid } },
-  }
-  for _, r in ipairs(RAIL) do railKids[#railKids + 1] = railItem(r) end
+  -- 导航栏：按 HMCL 分组排布（分组标题 = 小字 + 右侧细分隔线）
+  local railKids = {}
+  for _, sec in ipairs(RAIL_SECTIONS) do
+    if sec.name then
+      railKids[#railKids + 1] = ui.row { width = "100%", crossAlign = "center", spacing = "0.8vh",
+        padding = { left = "1.2vh", right = "1.2vh", top = "1.2vh", bottom = "0.4vh" }, children = {
+          ui.text { text = sec.name, style = { font = "1.8vh", weight = "bold", color = C.mid } },
+          ui.row { weight = 1, height = "0.08vh", background = C.border, children = {} },
+        } }
+    end
+    for _, r in ipairs(sec.items) do railKids[#railKids + 1] = railItem(r) end
+  end
   railKids[#railKids + 1] = ui.spacer { weight = 1 }
 
   return ui.column {
     id = "shell", crossAlign = "stretch", spacing = 0,
     children = {
-      -- 顶栏（浅色通栏：品牌 + 窗口按钮）
+      -- 顶栏（HMCL 品牌色通栏：白色标题 + ? / − / ✕ 窗口按钮）
       ui.row { id = "titlebar", height = "7vh", background = C.topbar, crossAlign = "center",
         spacing = "1.2vh", padding = { left = "2.2vh", right = "1.8vh" }, children = {
-          ui.image { id = "logoIcon", icon = "sf:cube.transparent.fill", size = "3vh", style = { tint = C.accent } },
-          ui.text { id = "logo", text = "Pear", style = { font = "3vh", weight = "bold", color = C.accent } },
-          ui.text { id = "logoSub", text = "启动器", style = { font = "2vh", color = C.mid } },
+          ui.image { id = "logoIcon", icon = "sf:cube.transparent.fill", size = "3vh", style = { tint = C.white } },
+          ui.text { id = "logo", text = "Pear", style = { font = "3vh", weight = "bold", color = C.white } },
+          ui.text { id = "logoSub", text = "启动器", style = { font = "2vh", color = C.white } },
           ui.spacer { weight = 1 },
-          ui.image { id = "winMin", icon = "sf:minus", size = "2.4vh", style = { tint = C.mid } },
-          ui.image { id = "winClose", icon = "sf:xmark", size = "2.4vh", style = { tint = C.mid } },
+          ui.image { id = "winHelp", icon = "sf:questionmark.circle", size = "2.4vh", style = { tint = C.white } },
+          ui.image { id = "winMin", icon = "sf:minus", size = "2.4vh", style = { tint = C.white } },
+          ui.image { id = "winClose", icon = "sf:xmark", size = "2.4vh", style = { tint = C.white } },
         } },
-      -- 主体：窄图标导航栏 + 内容区
+      -- 主体：文字导航栏 + 内容区
       ui.row { id = "page", weight = 1, crossAlign = "stretch", spacing = 0, children = {
-        ui.column { id = "rail", width = "8vh", background = C.card, crossAlign = "center",
-          spacing = "0.8vh", padding = { left = "0.6vh", right = "0.6vh", top = "1.2vh", bottom = "1.2vh" },
+        ui.column { id = "rail", width = "20vh", background = C.card, crossAlign = "stretch",
+          spacing = "0.4vh", padding = { left = "1vh", right = "1vh", top = "1.2vh", bottom = "1.2vh" },
           children = railKids },
         ui.content {
           id = "content", weight = 1, initialPage = "home",
@@ -915,13 +941,6 @@ local function refreshVersion()
   if launcher.view("homeVer_v") then launcher.view("homeVer_v"):setText(label) end
   if launcher.view("vdVersion") then launcher.view("vdVersion"):setText(label) end
   if launcher.view("vsName") then launcher.view("vsName"):setText(label) end
-end
-
-local function refreshBrand()
-  local st = launcher.getState and launcher.getState() or nil
-  local sui = (type(st) == "table" and type(st.ui) == "table") and st.ui or nil
-  local brand = (sui and sui.name and sui.name ~= "") and sui.name or "Pear"
-  if launcher.view("railBrand") then launcher.view("railBrand"):setText(brand) end
 end
 
 local function refreshSettingsCats()
@@ -1047,7 +1066,6 @@ end
 function onReady()
   refreshAccount()
   refreshVersion()
-  refreshBrand()
   onPageChange(currentPage)
 end
 
@@ -1244,9 +1262,9 @@ function onClick(id)
     refreshDownloadGroups()
     return
   end
-  local dgv = id:match("^dlGrpVer_(.+)_(%d+)$")
-  if dgv then
-    local it = (dlGroups[dgv[1]] or {})[tonumber(dgv[2])]
+  local dgGroup, dgIndex = id:match("^dlGrpVer_(.+)_(%d+)$")
+  if dgGroup then
+    local it = (dlGroups[dgGroup] or {})[tonumber(dgIndex)]
     if it and it.id then
       PLC.mc = it.id
       dlLevel = "install"
@@ -1270,9 +1288,9 @@ function onClick(id)
     end
     return
   end
-  local cpv = id:match("^dlCompV_(%d+)_(%d+)$")
-  if cpv then
-    local i = tonumber(cpv[1])
+  local cpIndex = id:match("^dlCompV_(%d+)_(%d+)$")
+  if cpIndex then
+    local i = tonumber(cpIndex)
     compSel[i] = true
     refreshInstallPanel()
     return
