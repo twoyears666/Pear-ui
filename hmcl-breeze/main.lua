@@ -1,4 +1,4 @@
--- Pear 启动器 · HMCL 清风蓝调 UI 包 —— v0.1.0-beta
+-- Pear 启动器 · HMCL 清风蓝调 UI 包 —— v0.1.1-beta
 --
 -- 视觉仿 HMCL（Hello Minecraft! Launcher）：
 --   · 顶栏为品牌色通栏（#4E6FBE）+ 白色标题/图标，右侧 ? / − / ✕ 窗口按钮
@@ -16,7 +16,7 @@
 --   点击：引擎派发下划线形式的节点 id，onClick 用 string.match 剥后缀/前缀匹配。
 
 function describe()
-  return { name = "清风蓝调", version = "0.1.0-beta" }
+  return { name = "清风蓝调", version = "0.1.1-beta" }
 end
 
 local C = {
