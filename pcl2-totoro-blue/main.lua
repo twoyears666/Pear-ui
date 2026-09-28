@@ -13,7 +13,7 @@
 -- 结构约定（PLUIShellViewController.showLuaPage 依赖）：CONFIG.pages 的 token → 内容区页节点 id。
 
 function describe()
-  return { name = "PCL 浅色", version = "1.25.0-beta" }
+  return { name = "PCL 浅色", version = "1.26.0-beta" }
 end
 
 local C = {
@@ -87,8 +87,8 @@ local CONFIG = {
         { id = "dlCat_datapack",     label = "数据包",  icon = "sf:doc.text.fill",               kind = "comm",  key = "datapack" },
         { id = "dlCat_resourcepack", label = "资源包",  icon = "sf:photo.fill",                  kind = "comm",  key = "resourcepack" },
         { id = "dlCat_shader",       label = "光影",    icon = "sf:sun.max.fill",                kind = "comm",  key = "shader" },
-        { id = "dlCat_world",        label = "世界",    icon = "sf:globe",                       kind = "empty", key = "world" },
-        { id = "dlCat_favorite",     label = "收藏",    icon = "sf:star.fill",                   kind = "empty", key = "favorite" },
+        { id = "dlCat_world",        label = "世界",    icon = "sf:globe",                       kind = "world",    key = "world" },
+        { id = "dlCat_favorite",     label = "收藏",    icon = "sf:star.fill",                   kind = "favorite", key = "favorite" },
       } },
       { name = "安装", items = {
         { id = "dlCat_loader_vanilla",      label = "Minecraft",     icon = "sf:cube.fill",   kind = "loader", key = "vanilla" },
@@ -111,13 +111,13 @@ local CONFIG = {
     },
     maxVersionRows = 12,
     communitySlots = 6,
+    worldSlots = 6,
+    favSlots = 8,
     mcLabel = "Minecraft",
     installHint = "选择版本后点击「开始安装」，引擎将从官方源下载并安装该版本。",
-    loaderSuffix = "。引擎当前仅能安装原版 Minecraft，加载器本体需由引擎后续版本或游戏内补充安装。",
-    emptyText = {
-      world = "引擎暂不支持「世界」下载：未提供世界资源服务，无法在此检索或安装存档世界。",
-      favorite = "「收藏」是 PCL 本地收藏夹；引擎暂未提供收藏服务，故此处无内容可展示。",
-    },
+    loaderHint = "先在上方 Minecraft 列表中选中目标原版版本，再点击「安装加载器」，由引擎原生安装页选择加载器版本并完成安装。",
+    worldNote = "下方为当前版本的本地存档世界；「打开存档目录」可在系统文件 App 中查看。",
+    favNote = "下方为引擎收藏夹内容（任何 UI 包共用同一份）；在社区资源搜索结果中点击「收藏」可加入或移除。",
   },
   -- 设置页：左栏 4 组 11 项（仿 PCL PageSetupLeft：游戏 / 工具 / 启动器 / 关于）
   settings = {
@@ -219,10 +219,10 @@ local VS_KEYS   = groupKeys(CONFIG.versions.groups)
 
 -- 设置页「工具 · 游戏链接」条目（仿 PCL PageSetupLeft：游戏相关站点入口）
 local GAME_LINKS = {
-  { label = "Minecraft 官方网站", sub = "minecraft.net" },
-  { label = "中文 Wiki",           sub = "zh.minecraft.wiki" },
-  { label = "常见问题与帮助",       sub = "帮助文档" },
-  { label = "问题反馈",             sub = "提交反馈" },
+  { label = "Minecraft 官方网站", sub = "minecraft.net",      url = "https://www.minecraft.net/zh-hans" },
+  { label = "中文 Wiki",           sub = "zh.minecraft.wiki",  url = "https://zh.minecraft.wiki/" },
+  { label = "常见问题与帮助",       sub = "help.minecraft.net", url = "https://help.minecraft.net/" },
+  { label = "问题反馈",             sub = "提交反馈",           url = "https://github.com/twoyears666/A-pear/issues" },
 }
 
 -- ===== 通用构件 =====
@@ -269,9 +269,19 @@ local function plainButton(id, label, accent, action)
     style = { font = "2.4vh", tint = C.dark } }
 end
 
+-- actionRow 生成的按钮节点 id 为 `<rowId>_<i>`，语义动作放在 action 字段；
+-- 引擎派发的 onClick 是「节点 id」，故登记 节点id→语义动作，点击时先还原再分发。
+-- （带 ":" 前缀的动作由引擎 PLUIActionRouter 处理，无需登记）
+local ACTION_BY_NODE = {}
+
 local function actionRow(id, labels, actions)
   local kids = {}
-  for i, lab in ipairs(labels) do kids[#kids + 1] = plainButton(id .. "_" .. i, lab, false, actions and actions[i]) end
+  for i, lab in ipairs(labels) do
+    local act = actions and actions[i]
+    local nodeId = id .. "_" .. i
+    if act and not act:find(":", 1, true) then ACTION_BY_NODE[nodeId] = act end
+    kids[#kids + 1] = plainButton(nodeId, lab, false, act)
+  end
   return ui.row { width = "100%", height = "5.5vh", spacing = "2vh", children = kids }
 end
 
@@ -419,6 +429,7 @@ local dlSources = { { id = "modrinth", name = "Modrinth" } }
 local dlSourceIdx = 1
 local dlKeyword = ""
 local dlCommItems = {}
+local dlWorldItems, dlFavItems = {}, {}
 local commDownloading = false
 local homeItems = {}
 local langIdx = 1
@@ -688,25 +699,90 @@ local function doCommunitySearch()
   launcher.view("dlCommStatus"):setText("正在搜索「" .. kw .. "」…")
 end
 
+-- 收藏判定：按 projectId 与引擎收藏夹比对（搜索结果行显示「已收藏 / 收藏」）
+-- 搜索结果的 id 可能是数字，收藏夹内为字符串，统一 tostring 后比较。
+local function isFavorited(projectId)
+  if projectId == nil or projectId == "" then return false end
+  local pid = tostring(projectId)
+  for _, it in ipairs(dlFavItems or {}) do
+    if type(it) == "table" and tostring(it.projectId) == pid then return true end
+  end
+  return false
+end
+
+-- 世界（本地存档）：引擎 worlds 通用服务
+local function refreshWorldsInto()
+  local resp = launcher.service and launcher.service("worlds", "list", {}) or nil
+  local items = (type(resp) == "table" and type(resp.items) == "table") and resp.items or {}
+  local n = CONFIG.download.worldSlots or 6
+  for i = 1, n do
+    local it = items[i]
+    local row = launcher.view("dlWorld_" .. i)
+    if row then
+      row:setVisible(it ~= nil)
+      if it then
+        launcher.view("dlWorld_" .. i .. "_name"):setText(it.name or it.folder or "")
+        local meta = {}
+        if type(it.folder) == "string" and it.folder ~= "" then meta[#meta + 1] = it.folder end
+        if type(it.lastPlayed) == "string" and it.lastPlayed ~= "" then meta[#meta + 1] = "最近 " .. it.lastPlayed end
+        launcher.view("dlWorld_" .. i .. "_meta"):setText(#meta > 0 and table.concat(meta, " · ") or "")
+      end
+    end
+  end
+  dlWorldItems = items
+  if launcher.view("dlWorldEmpty") then launcher.view("dlWorldEmpty"):setVisible(#items == 0) end
+end
+
+-- 收藏：引擎 favorites 通用服务（引擎级 JSON，任何 UI 包共用）
+local function refreshFavoritesInto()
+  local resp = launcher.service and launcher.service("favorites", "list", {}) or nil
+  local items = (type(resp) == "table" and type(resp.items) == "table") and resp.items or {}
+  local n = CONFIG.download.favSlots or 8
+  for i = 1, n do
+    local it = items[i]
+    local row = launcher.view("dlFav_" .. i)
+    if row then
+      row:setVisible(it ~= nil)
+      if it then
+        launcher.view("dlFav_" .. i .. "_name"):setText(it.title or it.projectId or "")
+        local meta = {}
+        if type(it.category) == "string" and it.category ~= "" then meta[#meta + 1] = tostring(TOKEN_LABEL[it.category] or it.category) end
+        if type(it.author) == "string" and it.author ~= "" then meta[#meta + 1] = it.author end
+        launcher.view("dlFav_" .. i .. "_meta"):setText(#meta > 0 and table.concat(meta, " · ") or tostring(it.projectId or ""))
+      end
+    end
+  end
+  dlFavItems = items
+  if launcher.view("dlFavEmpty") then launcher.view("dlFavEmpty"):setVisible(#items == 0) end
+  -- 搜索结果中的收藏标记随之刷新
+  for i = 1, CONFIG.download.communitySlots do
+    local it = dlCommItems[i]
+    local btn = launcher.view("dlCommFav_" .. i)
+    if btn and it then btn:setText(isFavorited(it.id) and "已收藏" or "收藏") end
+  end
+end
+
 local function refreshDownloadCategory()
   local it = currentDlCat()
   local kind = (it and it.kind) or "mc"
   launcher.view("dlTitle"):setText((it and it.label) or "原版游戏")
   launcher.view("dlSecMC"):setVisible(kind == "mc" or kind == "loader")
   launcher.view("dlSecC"):setVisible(kind == "comm")
-  launcher.view("dlSecEmpty"):setVisible(kind == "empty")
+  launcher.view("dlSecWorld"):setVisible(kind == "world")
+  launcher.view("dlSecFav"):setVisible(kind == "favorite")
   launcher.view("dlProgress"):setVisible(false)
   if kind == "loader" then
-    launcher.view("insSummary"):setText("已选择安装「" .. tostring(it.label) .. "」" .. CONFIG.download.loaderSuffix)
+    launcher.view("insSummary"):setText(CONFIG.download.loaderHint)
+    launcher.view("insStart"):setText("安装加载器")
     launcher.view("dlLoaderNote"):setVisible(true)
-    launcher.view("dlLoaderNoteText"):setText("加载器（" .. tostring(it.label) .. "）需在对应原版版本上安装；引擎暂不提供加载器本体下载。")
+    launcher.view("dlLoaderNoteText"):setText("加载器（" .. tostring(it.label) .. "）将安装到所选原版版本上；点击「安装加载器」后由引擎原生安装页选择加载器版本。")
   else
     launcher.view("insSummary"):setText(CONFIG.download.installHint)
+    launcher.view("insStart"):setText("开始安装")
     launcher.view("dlLoaderNote"):setVisible(false)
   end
-  if kind == "empty" then
-    launcher.view("dlEmptyText"):setText(CONFIG.download.emptyText[it.key] or "引擎暂不支持该分类。")
-  end
+  if kind == "world" then refreshWorldsInto() end
+  if kind == "favorite" then refreshFavoritesInto() end
   if kind == "comm" then refreshCommunitySearch() end
   dlLevel = "groups"
   refreshDownloadState()
@@ -823,6 +899,9 @@ local function buildDownloadPage()
           ui.text { id = "dlComm_" .. i .. "_title", text = "", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
           ui.text { id = "dlComm_" .. i .. "_meta", text = "", width = "100%", style = { font = "2vh", color = C.mid } },
         } },
+        ui.button { id = "dlCommFav_" .. i, label = "收藏", width = "11vh", height = "4.2vh",
+          corner = "pill", action = "dlCommFav_" .. i, hoverColor = C.hover,
+          style = { font = "2.1vh", tint = C.accent, background = C.faintBlue, weight = "bold" } },
         ui.text { id = "dlComm_" .. i .. "_btn", text = "下载", style = { font = "2.2vh", color = C.accent } },
       } }
   end
@@ -846,10 +925,58 @@ local function buildDownloadPage()
       ui.text { id = "dlCommBarLabel", text = "", width = "100%", style = { font = "2.2vh", color = C.dark } },
     } }
 
-  local emptyCard = card("dlEmptyCard", {
-    ui.text { id = "dlEmptyTitle", text = "暂不可用", width = "100%", style = { font = "2.8vh", weight = "bold", color = C.dark } },
-    ui.text { id = "dlEmptyText", text = "引擎暂不支持该分类。", width = "100%", style = { font = "2.2vh", color = C.mid } },
-  }, { spacing = "1.6vh" })
+  -- 世界（本地存档列表，引擎 worlds 服务）
+  local worldRows = {
+    ui.text { text = "本地世界", width = "100%", style = { font = "2.6vh", weight = "bold", color = C.dark } },
+    ui.text { text = D.worldNote, width = "100%", style = { font = "2.1vh", color = C.mid } },
+  }
+  for i = 1, (D.worldSlots or 6) do
+    worldRows[#worldRows + 1] = ui.row { id = "dlWorld_" .. i, height = "7vh", width = "100%", background = C.card,
+      border = BORDER, corner = "0.8vh", crossAlign = "center", spacing = "1.2vh",
+      padding = { left = "1.2vh", right = "1.2vh" }, children = {
+        ui.image { id = "dlWorld_" .. i .. "_ico", icon = "sf:globe", size = "3vh", style = { tint = C.accent } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+          ui.text { id = "dlWorld_" .. i .. "_name", text = "", width = "100%", style = { font = "2.3vh", color = C.dark } },
+          ui.text { id = "dlWorld_" .. i .. "_meta", text = "", width = "100%", style = { font = "1.9vh", color = C.mid } },
+        } },
+        ui.button { id = "dlWorldX_" .. i, label = "删除", width = "10vh", height = "4.2vh",
+          corner = "pill", action = "dlWorldX_" .. i, hoverColor = C.hover,
+          style = { font = "2.1vh", tint = C.danger, background = C.card, weight = "bold" } },
+      } }
+  end
+  worldRows[#worldRows + 1] = ui.text { id = "dlWorldEmpty", text = "当前版本暂无本地存档世界。",
+    width = "100%", style = { font = "2.2vh", color = C.mid } }
+  worldRows[#worldRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh", children = {
+    plainButton("dlWorldOpenDir", "打开存档目录", false, "dlWorldOpenDir"),
+    plainButton("dlWorldRefresh", "刷新列表", false, "dlWorldRefresh"),
+  } }
+  local worldCard = card("dlWorldCard", worldRows, { spacing = "1.5vh" })
+
+  -- 收藏（引擎级收藏夹，任何 UI 包共用）
+  local favRows = {
+    ui.text { text = "收藏夹", width = "100%", style = { font = "2.6vh", weight = "bold", color = C.dark } },
+    ui.text { text = D.favNote, width = "100%", style = { font = "2.1vh", color = C.mid } },
+  }
+  for i = 1, (D.favSlots or 8) do
+    favRows[#favRows + 1] = ui.row { id = "dlFav_" .. i, height = "6.5vh", width = "100%", background = C.card,
+      border = BORDER, corner = "0.8vh", crossAlign = "center", spacing = "1.2vh",
+      padding = { left = "1.2vh", right = "1.2vh" }, children = {
+        ui.image { id = "dlFav_" .. i .. "_ico", icon = "sf:star.fill", size = "3vh", style = { tint = C.orange } },
+        ui.column { weight = 1, justify = "center", spacing = "0.3vh", children = {
+          ui.text { id = "dlFav_" .. i .. "_name", text = "", width = "100%", style = { font = "2.3vh", color = C.dark } },
+          ui.text { id = "dlFav_" .. i .. "_meta", text = "", width = "100%", style = { font = "1.9vh", color = C.mid } },
+        } },
+        ui.button { id = "dlFavX_" .. i, label = "移除", width = "10vh", height = "4.2vh",
+          corner = "pill", action = "dlFavX_" .. i, hoverColor = C.hover,
+          style = { font = "2.1vh", tint = C.danger, background = C.card, weight = "bold" } },
+      } }
+  end
+  favRows[#favRows + 1] = ui.text { id = "dlFavEmpty", text = "收藏夹为空：在社区资源搜索结果中点「收藏」即可加入。",
+    width = "100%", style = { font = "2.2vh", color = C.mid } }
+  favRows[#favRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh", children = {
+    plainButton("dlFavRefresh", "刷新列表", false, "dlFavRefresh"),
+  } }
+  local favCard = card("dlFavCard", favRows, { spacing = "1.5vh" })
 
   return ui.column { id = "pageDownload", weight = 1, crossAlign = "center", padding = "1.6vh", spacing = "2vh", children = {
     section("dlTitleSec", {
@@ -857,7 +984,8 @@ local function buildDownloadPage()
     }),
     section("dlSecMC", { groupsCard, viewer }),
     section("dlSecC", { card("dlSearchCard", searchKids, { spacing = "1.5vh" }), card("dlResultCard", resultKids, { spacing = "1.5vh" }) }),
-    section("dlSecEmpty", { emptyCard }),
+    section("dlSecWorld", { worldCard }),
+    section("dlSecFav", { favCard }),
   } }
 end
 
@@ -974,7 +1102,7 @@ local function buildSettingsPage()
     linkRows[#linkRows + 1] = navRow("setLink_" .. i, m.label, m.sub, "setLink_" .. i)
   end
   linkRows[#linkRows + 1] = hintRow("setLinkHintRow", "setLinkHint",
-    "以上链接由系统浏览器或启动器原生界面打开；引擎未提供内嵌浏览器服务。")
+    "点击条目将由系统浏览器打开对应网页。")
   sec("tool.link", { card("setLinkCard", linkRows, { spacing = "1.2vh" }) })
 
   -- 启动器 · 界面
@@ -1015,26 +1143,31 @@ local function buildSettingsPage()
   -- 关于 · 更新
   sec("about.update", { card("aboutUpdateCard", {
     ui.text { id = "aboutUpdateCur", text = "当前版本 ···", width = "100%", style = { font = "2.5vh", color = C.dark } },
-    ui.text { id = "aboutUpdateStatus", text = "引擎暂不提供在线更新检查服务。", width = "100%", style = { font = "2.2vh", color = C.mid } },
-    ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
+    ui.text { id = "aboutUpdateStatus", text = "点击「检查更新」向 GitHub Releases 查询最新正式版。", width = "100%", style = { font = "2.2vh", color = C.mid } },
+    ui.text { id = "aboutUpdateNotes", text = "", width = "100%", style = { font = "2.1vh", color = C.mid } },
+    ui.row { width = "100%", height = "5.5vh", spacing = "2vh", children = {
       plainButton("aboutUpdateBtn", "检查更新", false, "aboutUpdateBtn"),
+      plainButton("aboutUpdateOpen", "打开发布页", false, "aboutUpdateOpen"),
     } },
   }, { spacing = "1.4vh" }) })
 
   -- 关于 · 反馈
   sec("about.feedback", { card("aboutFeedbackCard", {
-    ui.text { id = "aboutFeedbackText", text = "反馈渠道由启动器原生页面提供；引擎未暴露反馈服务。",
+    ui.text { id = "aboutFeedbackText", text = "反馈通过项目 Issue 页面提交；点击下方按钮在系统浏览器中打开。",
       width = "100%", style = { font = "2.2vh", color = C.mid } },
     ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
-      plainButton("aboutFeedbackBtn", "查看说明", false, "aboutFeedbackBtn"),
+      plainButton("aboutFeedbackBtn", "打开反馈页面", false, "aboutFeedbackBtn"),
     } },
   }, { spacing = "1.4vh" }) })
 
   -- 关于 · 日志
   sec("about.log", { card("aboutLogCard", {
     ui.text { text = "日志", width = "100%", style = { font = "2.6vh", weight = "bold", color = C.dark } },
-    ui.text { id = "aboutLogText", text = "引擎未提供日志读取服务，无法在此展示启动日志；请在系统日志或引擎原生界面查看。",
+    ui.text { id = "aboutLogText", text = "点击「读取日志」获取游戏日志（无游戏日志时回退启动器日志）末尾内容。",
       width = "100%", style = { font = "2.2vh", color = C.mid } },
+    ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
+      plainButton("aboutLogBtn", "读取日志", false, "aboutLogBtn"),
+    } },
   }, { spacing = "1.4vh" }) })
 
   local kids = {}
@@ -1132,11 +1265,11 @@ local function refreshMods()
         if type(it.author) == "string" and it.author ~= "" then meta[#meta + 1] = it.author end
         if type(it.gameVersion) == "string" and it.gameVersion ~= "" then meta[#meta + 1] = it.gameVersion end
         launcher.view("vsMod_" .. i .. "_meta"):setText(#meta > 0 and table.concat(meta, " · ") or (it.fileName or ""))
-        launcher.view("vsModT_" .. i):setText((it.enabled == true) and "停用" or "启用")
+        launcher.view("vsMod_T_" .. i):setText((it.enabled == true) and "停用" or "启用")
       end
     end
   end
-  if launcher.view("vsModEmpty") then launcher.view("vsModEmpty"):setVisible(#items == 0) end
+  if launcher.view("vsMod_Empty") then launcher.view("vsMod_Empty"):setVisible(#items == 0) end
 end
 
 local function refreshShadersInto(prefix, emptyId)
@@ -1162,6 +1295,58 @@ local function refreshShadersInto(prefix, emptyId)
   if emptyId and launcher.view(emptyId) then launcher.view(emptyId):setVisible(#items == 0) end
 end
 
+-- 资源包（引擎 resourcepacks 通用服务，与 mods/shaders 同构）
+local function refreshPacksInto(prefix, emptyId)
+  local resp = launcher.service and launcher.service("resourcepacks", "list", {}) or nil
+  local items = (type(resp) == "table" and type(resp.items) == "table") and resp.items or {}
+  local n = CONFIG.versions.slots
+  for i = 1, n do
+    local it = items[i]
+    local row = launcher.view(prefix .. i)
+    if row then
+      row:setVisible(it ~= nil)
+      if it then
+        launcher.view(prefix .. i .. "_name"):setText(it.name or it.fileName or "")
+        local meta = {}
+        if type(it.author) == "string" and it.author ~= "" then meta[#meta + 1] = it.author end
+        if type(it.gameVersion) == "string" and it.gameVersion ~= "" then meta[#meta + 1] = it.gameVersion end
+        launcher.view(prefix .. i .. "_meta"):setText(#meta > 0 and table.concat(meta, " · ") or (it.fileName or ""))
+        local t = launcher.view(prefix .. "T_" .. i)
+        if t then t:setText((it.enabled == true) and "停用" or "启用") end
+      end
+    end
+  end
+  if emptyId and launcher.view(emptyId) then launcher.view(emptyId):setVisible(#items == 0) end
+end
+
+-- 通用文件列表（引擎 files 服务）：截图 / 投影等标准目录
+local function refreshFilesInto(prefix, dirName, ext, emptyId, emptyText)
+  local resp = launcher.service and launcher.service("files", "list",
+    { dir = dirName, ext = ext, limit = CONFIG.versions.slots * 2 }) or nil
+  local items = (type(resp) == "table" and type(resp.items) == "table") and resp.items or {}
+  local n = CONFIG.versions.slots
+  for i = 1, n do
+    local it = items[i]
+    local row = launcher.view(prefix .. i)
+    if row then
+      row:setVisible(it ~= nil)
+      if it then
+        launcher.view(prefix .. i .. "_name"):setText(it.name or it.fileName or "")
+        local size = tonumber(it.size) or 0
+        local sizeText
+        if size >= 1048576 then sizeText = string.format("%.1f MB", size / 1048576)
+        elseif size >= 1024 then sizeText = string.format("%.1f KB", size / 1024)
+        else sizeText = tostring(size) .. " B" end
+        launcher.view(prefix .. i .. "_meta"):setText((it.isDir == true and "文件夹 · " or "") .. sizeText)
+      end
+    end
+  end
+  if emptyId and launcher.view(emptyId) then
+    launcher.view(emptyId):setText(emptyText or "当前目录暂无文件。")
+    launcher.view(emptyId):setVisible(#items == 0)
+  end
+end
+
 local function refreshVsData()
   local ver = launcher.state and launcher.state.version
   local name = (ver and ver.name) or "未选择版本"
@@ -1171,8 +1356,10 @@ local function refreshVsData()
   refreshVSInto("vset_", VS_LABEL_KEYS, map)
   refreshVsInstall()
   refreshMods()
-  refreshShadersInto("vsShade_", "vsShadeEmpty")
-  refreshShadersInto("vsRp_", "vsRpEmpty")
+  refreshShadersInto("vsShade_", "vsShade_Empty")
+  refreshPacksInto("vsRp_", "vsRp_Empty")
+  refreshFilesInto("vsShot_", "screenshots", "png,jpg,jpeg", "vsShot_Empty", "当前版本暂无截图。")
+  refreshFilesInto("vsLit_", "schematics", "litematic,schem,schematic,nbt", "vsLit_Empty", "当前版本暂无投影文件。")
   refreshMp("vsSrv")
 end
 
@@ -1254,16 +1441,18 @@ local function buildVersionSettingsPage()
         chevron(),
       } }
   end
-  instRows[#instRows + 1] = hintRow("vsInstHint", "vsInstHintText", "引擎未提供「补全文件 / 安装加载器」服务，可在此选择已安装版本，或前往下载页安装新版本。")
-  instRows[#instRows + 1] = actionRow("vsInstRow", { "打开版本目录", "前往下载页" }, { "vsInstOpenDir", "open:download" })
+  instRows[#instRows + 1] = hintRow("vsInstHint", "vsInstHintText", "点击列表中的已安装版本可切换当前使用版本；「安装加载器 / 补全文件」将由引擎原生安装页完成。")
+  instRows[#instRows + 1] = actionRow("vsInstRow", { "安装加载器 / 补全文件", "打开版本目录", "前往下载页" },
+    { "vsInstLoader", "vsInstOpenDir", "open:download" })
   sec("install", { card("vsInstCard", instRows, { spacing = "1.5vh" }) })
 
   -- 导出
   sec("export", { card("vsExportCard", {
-    ui.text { text = "导出启动脚本", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
-    ui.text { id = "vsExportText", text = "引擎未提供启动脚本导出服务；可打开版本目录手动导出所需文件。",
+    ui.text { text = "导出整合包", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
+    ui.text { id = "vsExportText", text = "由引擎原生整合包导出页完成导出（支持多种格式与文件过滤）。",
       width = "100%", style = { font = "2.2vh", color = C.mid } },
-    ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
+    ui.row { width = "100%", height = "5.5vh", spacing = "2vh", children = {
+      plainButton("vsExportOpen", "打开导出页", false, "open:modpackExport"),
       plainButton("vsExportOpenDir", "打开版本目录", false, "vsExportOpenDir"),
     } },
   }, { spacing = "1.4vh" }) })
@@ -1278,15 +1467,15 @@ local function buildVersionSettingsPage()
     } },
   }, { spacing = "1.4vh" }) })
 
-  -- 截图
-  sec("shots", { card("vsShotsCard", {
-    ui.text { text = "截图", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
-    ui.text { id = "vsShotsText", text = "引擎未提供截图读取服务，无法在此展示截图；可打开版本目录查看。",
-      width = "100%", style = { font = "2.2vh", color = C.mid } },
-    ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
-      plainButton("vsShotsOpenDir", "打开版本目录", false, "vsShotsOpenDir"),
-    } },
-  }, { spacing = "1.4vh" }) })
+  -- 截图（引擎 files 服务列出 screenshots/ 内图片）
+  local shotRows = vsListCard("vsShot_", "截图", "当前版本暂无截图。", false)
+  shotRows[#shotRows + 1] = ui.text { id = "vsShotsText", text = "按修改时间倒序列出 screenshots 目录中的图片文件（最多显示若干条）。",
+    width = "100%", style = { font = "2.1vh", color = C.mid } }
+  shotRows[#shotRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh", children = {
+    plainButton("vsShotsOpenDir", "打开截图目录", false, "vsShotsOpenDir"),
+    plainButton("vsShotsRefresh", "刷新列表", false, "vsShotsRefresh"),
+  } }
+  sec("shots", { card("vsShotsCard", shotRows, { spacing = "1.5vh" }) })
 
   -- Mod
   local modRows = vsListCard("vsMod_", "Mod 列表", "当前版本未安装 Mod 加载器或暂无 Mod。", true)
@@ -1297,12 +1486,12 @@ local function buildVersionSettingsPage()
   } }
   sec("mods", { card("vsModCard", modRows, { spacing = "1.5vh" }) })
 
-  -- 资源包（引擎无独立资源包服务：复用光影扫描结果占位）
-  local rpRows = vsListCard("vsRp_", "资源包", "引擎暂无独立资源包服务；此处以光影扫描结果占位显示。", false)
-  rpRows[#rpRows + 1] = ui.text { id = "vsRpText", text = "资源包与光影包同为压缩资源；引擎仅暴露光影扫描，故此处内容可能不完整。",
+  -- 资源包（引擎 resourcepacks 通用服务）
+  local rpRows = vsListCard("vsRp_", "资源包", "当前版本暂无资源包。", true)
+  rpRows[#rpRows + 1] = ui.text { id = "vsRpText", text = "从当前版本的 resourcepacks 目录读取；「启用 / 停用」通过重命名文件后缀实现。",
     width = "100%", style = { font = "2.1vh", color = C.mid } }
   rpRows[#rpRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh", children = {
-    plainButton("vsRpOpenDir", "打开版本目录", false, "vsRpOpenDir"),
+    plainButton("vsRpOpenDir", "打开资源包目录", false, "vsRpOpenDir"),
     plainButton("vsRpRefresh", "刷新列表", false, "vsRpRefresh"),
   } }
   sec("rp", { card("vsRpCard", rpRows, { spacing = "1.5vh" }) })
@@ -1315,15 +1504,15 @@ local function buildVersionSettingsPage()
   } }
   sec("shaders", { card("vsShadeCard", shadeRows, { spacing = "1.5vh" }) })
 
-  -- 投影
-  sec("litematica", { card("vsLitCard", {
-    ui.text { text = "投影", width = "100%", style = { font = "2.4vh", weight = "bold", color = C.dark } },
-    ui.text { id = "vsLitText", text = "引擎未提供投影（Litematica）服务，无法在此管理投影文件。",
-      width = "100%", style = { font = "2.2vh", color = C.mid } },
-    ui.row { width = "100%", height = "5.5vh", spacing = "3vh", children = {
-      plainButton("vsLitOpenDir", "打开版本目录", false, "vsLitOpenDir"),
-    } },
-  }, { spacing = "1.4vh" }) })
+  -- 投影（引擎 files 服务列出 schematics/ 内投影文件）
+  local litRows = vsListCard("vsLit_", "投影", "当前版本暂无投影文件。", false)
+  litRows[#litRows + 1] = ui.text { id = "vsLitText", text = "列出 schematics 目录中的投影文件（litematic / schem / schematic / nbt）。",
+    width = "100%", style = { font = "2.1vh", color = C.mid } }
+  litRows[#litRows + 1] = ui.row { width = "100%", height = "5.5vh", spacing = "1.5vh", children = {
+    plainButton("vsLitOpenDir", "打开投影目录", false, "vsLitOpenDir"),
+    plainButton("vsLitRefresh", "刷新列表", false, "vsLitRefresh"),
+  } }
+  sec("litematica", { card("vsLitCard", litRows, { spacing = "1.5vh" }) })
 
   -- 服务器
   local srvKids = {
@@ -1734,6 +1923,8 @@ function onReady()
     dlSources = srcResp.items
   end
   refreshDownloadVersions()
+  refreshFavoritesInto()
+  refreshWorldsInto()
   if launcher.view("setLangVal") then launcher.view("setLangVal"):setText(LANGS[langIdx]) end
   onPageChange(currentPage)
 end
@@ -1769,6 +1960,7 @@ function onPageChange(page)
   elseif page == "download" then
     refreshDownloadSidebar()
     refreshDownloadVersions()
+    refreshFavoritesInto()
     refreshDownloadCategory()
   elseif page == "multi" then
     selectSegment("segM", CONFIG.online.branch, segSel["segM"] or 1)
@@ -1837,6 +2029,7 @@ function onCommunityResults(payload)
         launcher.view("dlComm_" .. i .. "_title"):setText(it.title or "未知资源")
         local author = it.author or ""
         launcher.view("dlComm_" .. i .. "_meta"):setText((author ~= "") and (author .. " · 下载 " .. tostring(it.downloads or 0)) or ("下载 " .. tostring(it.downloads or 0)))
+        launcher.view("dlComm_" .. i .. "_fav"):setText(isFavorited(it.id) and "已收藏" or "收藏")
       end
     end
   end
@@ -1871,8 +2064,30 @@ function onModsUpdated(payload)
 end
 
 function onShadersUpdated(payload)
-  refreshShadersInto("vsShade_", "vsShadeEmpty")
-  refreshShadersInto("vsRp_", "vsRpEmpty")
+  refreshShadersInto("vsShade_", "vsShade_Empty")
+end
+
+function onWorldsUpdated(payload)
+  refreshWorldsInto()
+end
+
+function onUpdateChecked(payload)
+  local p = (type(payload) == "table") and payload or {}
+  if not launcher.view("aboutUpdateStatus") then return end
+  if p.ok ~= true then
+    launcher.view("aboutUpdateStatus"):setText("检查更新失败：" .. tostring(p.error or "网络不可用") .. "（当前版本 " .. tostring(p.current or "") .. "）")
+    return
+  end
+  if p.hasUpdate == true then
+    launcher.view("aboutUpdateStatus"):setText("发现新版本 " .. tostring(p.latest or "") .. "（当前 " .. tostring(p.current or "") .. "），点击「打开发布页」查看。")
+    local notes = tostring(p.notes or "")
+    notes = notes:gsub("%s+$", "")
+    if #notes > 400 then notes = notes:sub(1, 400) .. "…" end
+    launcher.view("aboutUpdateNotes"):setText(notes)
+  else
+    launcher.view("aboutUpdateStatus"):setText("已是最新正式版（" .. tostring(p.current or "") .. "）。")
+    launcher.view("aboutUpdateNotes"):setText("")
+  end
 end
 
 function onMultiplayerStatus(payload)
@@ -1904,6 +2119,10 @@ function onClick(id)
   if id == "cap.offline" then selectCap(3) return end
 
   local base = baseId(id)
+
+  -- actionRow 内的按钮：节点 id（如 vsInstRow_1）还原为语义动作（如 vsInstLoader）后再分发
+  local mapped = ACTION_BY_NODE[id]
+  if mapped and mapped ~= id then onClick(mapped) return end
 
   -- ===== 启动页 =====
   -- 启动页各入口均走引擎 action（open:download / open:settings / open:accountManager /
@@ -1956,6 +2175,17 @@ function onClick(id)
   end
   if base == "dlBackGrp" then dlLevel = "groups" refreshDownloadState() return end
   if base == "insStart" then
+    -- 加载器分类：交由引擎原生加载器安装页（通用 loader 服务）
+    local catItem = currentDlCat()
+    if catItem and catItem.kind == "loader" then
+      if PLC.mc == "" or PLC.mc == nil then
+        launcher.view("insSummary"):setText("请先在上方 Minecraft 列表中选择目标原版版本。")
+        return
+      end
+      launcher.view("insSummary"):setText("正在打开引擎原生加载器安装页（" .. tostring(PLC.mc) .. "）…")
+      launcher.service("loader", "install", { version = PLC.mc })
+      return
+    end
     if PLC.mc == "" or PLC.mc == nil then
       launcher.view("dlProgress"):setVisible(true)
       launcher.view("dlProgressLabel"):setText("请先选择 Minecraft 版本")
@@ -1977,7 +2207,21 @@ function onClick(id)
     launcher.view("dlCommStatus"):setText("已切换搜索源，请重新搜索。")
     return
   end
-  if base == "dlObjRow" then return end
+  if base == "dlObjRow" then
+    -- 搜索对象与左栏分类联动：点击在社区资源分类间循环切换
+    local comms = {}
+    for _, g in ipairs(CONFIG.download.sidebarGroups) do
+      for _, it in ipairs(g.items) do if it.kind == "comm" then comms[#comms + 1] = it end end
+    end
+    if #comms > 0 then
+      local idx = 0
+      for i, it in ipairs(comms) do if it.id == dlSelId then idx = i break end end
+      local nxt = comms[(idx % #comms) + 1]
+      selectDownloadCat(nxt)
+      launcher.view("dlCommStatus"):setText("搜索对象已切换为「" .. tostring(nxt.label) .. "」，请点击「搜索」。")
+    end
+    return
+  end
   if base == "dlKwRow" then launcher.service("community", "promptKeyword", { category = commCategory() }) return end
   if base == "dlBtnSearch" then doCommunitySearch() return end
   if base == "dlBtnReset" then
@@ -1998,6 +2242,46 @@ function onClick(id)
     end
     return
   end
+  -- 搜索结果「收藏 / 已收藏」：调用引擎通用收藏服务按 projectId 切换
+  local cfi = base:match("^dlCommFav_(%d+)$")
+  if cfi then
+    local it = dlCommItems[tonumber(cfi)]
+    if it and it.id then
+      launcher.service("favorites", "toggle", {
+        projectId = tostring(it.id), source = commSource().id, category = commCategory(),
+        title = it.title or "", author = it.author or "",
+      })
+      refreshFavoritesInto()
+      launcher.view("dlCommStatus"):setText("已更新收藏：「" .. tostring(it.title or it.id) .. "」")
+    end
+    return
+  end
+  -- 世界（本地存档）：删除 / 打开存档目录 / 刷新
+  local dwx = base:match("^dlWorldX_(%d+)$")
+  if dwx then
+    if dlWorldItems[tonumber(dwx)] then
+      launcher.service("worlds", "delete", { index = tonumber(dwx) - 1 })
+      refreshWorldsInto()
+    end
+    return
+  end
+  if base == "dlWorldOpenDir" then launcher.service("worlds", "openFolder", {}) return end
+  if base == "dlWorldRefresh" then
+    launcher.service("worlds", "refresh", {})
+    refreshWorldsInto()
+    return
+  end
+  -- 收藏：移除 / 刷新
+  local dfx = base:match("^dlFavX_(%d+)$")
+  if dfx then
+    local it = dlFavItems[tonumber(dfx)]
+    if it and it.projectId then
+      launcher.service("favorites", "remove", { projectId = tostring(it.projectId) })
+      refreshFavoritesInto()
+    end
+    return
+  end
+  if base == "dlFavRefresh" then refreshFavoritesInto() return end
 
   -- ===== 设置页 =====
   local sc = base:match("^stCat_(.+)$")
@@ -2038,11 +2322,14 @@ function onClick(id)
     end
     return
   end
-  -- 工具 · 游戏链接：引擎未提供内嵌浏览器，给出明确提示（非静默 no-op）
+  -- 工具 · 游戏链接：调用引擎通用 system.openURL（仅 http/https）
   local slk = base:match("^setLink_(%d+)$")
   if slk then
     local m = GAME_LINKS[tonumber(slk)]
-    setStatusText("「" .. tostring(m and m.label or "链接") .. "」将在系统浏览器中打开（引擎未提供内嵌浏览器服务）。")
+    if m and m.url then
+      launcher.service("system", "openURL", { url = m.url })
+      setStatusText("正在系统浏览器中打开「" .. tostring(m.label) .. "」。")
+    end
     return
   end
   local stok = base:match("^setTok_(.+)$")
@@ -2058,12 +2345,28 @@ function onClick(id)
     return
   end
   if base == "aboutUpdateBtn" then
-    local d = describe()
-    launcher.view("aboutUpdateStatus"):setText("引擎未提供在线更新检查服务；当前版本 " .. tostring(d.version or "未知") .. "。")
+    launcher.view("aboutUpdateStatus"):setText("正在向 GitHub Releases 检查更新…")
+    launcher.view("aboutUpdateNotes"):setText("")
+    launcher.service("update", "check", {})
+    return
+  end
+  if base == "aboutUpdateOpen" then
+    launcher.service("update", "openPage", {})
     return
   end
   if base == "aboutFeedbackBtn" then
-    launcher.view("aboutFeedbackText"):setText("反馈请通过启动器原生页面提交；引擎未暴露反馈服务。")
+    launcher.service("system", "openURL", { url = GAME_LINKS[4].url })
+    launcher.view("aboutFeedbackText"):setText("已在系统浏览器中打开项目 Issue 页面。")
+    return
+  end
+  if base == "aboutLogBtn" then
+    local resp = launcher.service and launcher.service("logs", "tail", { maxChars = 4000 }) or nil
+    local text = (type(resp) == "table" and resp.text) or ""
+    if text == "" then
+      launcher.view("aboutLogText"):setText("日志为空或尚未生成；启动一次游戏后再试。")
+    else
+      launcher.view("aboutLogText"):setText(text)
+    end
     return
   end
 
@@ -2104,25 +2407,49 @@ function onClick(id)
     if it and it.id then launcher.service("version", "select", { id = it.id }) refreshVsData() end
     return
   end
-  if base == "vsInstOpenDir" or base == "vsOpenDir" or base == "vsExportOpenDir" or base == "vsShotsOpenDir" or base == "vsLitOpenDir" then
+  if base == "vsInstOpenDir" or base == "vsOpenDir" or base == "vsExportOpenDir" then
     launcher.service("versionSettings", "openDir", {})
     return
   end
+  -- 各资源类型目录：走引擎通用 versionSettings.openFolder（白名单目录名）
   if base == "vsOpenSaves" or base == "vsSavesOpen" then launcher.service("versionSettings", "openSaves", {}) return end
-  if base == "vsOpenMods" or base == "vsModOpenDir" or base == "vsShadeOpenDir" or base == "vsRpOpenDir" then
+  if base == "vsOpenMods" or base == "vsModOpenDir" then
     launcher.service("versionSettings", "openMods", {})
     return
   end
-  local vmt = base:match("^vsModT_(%d+)$")
-  if vmt then launcher.service("mods", "toggle", { index = tonumber(vmt) - 1 }) return end
-  local vmx = base:match("^vsModX_(%d+)$")
-  if vmx then launcher.service("mods", "delete", { index = tonumber(vmx) - 1 }) return end
-  local vst = base:match("^vsShadeT_(%d+)$")
-  if vst then launcher.service("shaders", "toggle", { index = tonumber(vst) - 1 }) return end
-  local vsx = base:match("^vsShadeX_(%d+)$")
-  if vsx then launcher.service("shaders", "delete", { index = tonumber(vsx) - 1 }) return end
-  if base == "vsModRefresh" then launcher.service("mods", "refresh", {}) return end
-  if base == "vsShadeRefresh" or base == "vsRpRefresh" then launcher.service("shaders", "refresh", {}) return end
+  if base == "vsShadeOpenDir" then launcher.service("versionSettings", "openFolder", { name = "shaderpacks" }) return end
+  if base == "vsRpOpenDir" then launcher.service("versionSettings", "openFolder", { name = "resourcepacks" }) return end
+  if base == "vsShotsOpenDir" then launcher.service("versionSettings", "openFolder", { name = "screenshots" }) return end
+  if base == "vsLitOpenDir" then launcher.service("versionSettings", "openFolder", { name = "schematics" }) return end
+  -- 安装加载器 / 补全文件：引擎原生安装页（通用 loader 服务，参数为当前版本）
+  if base == "vsInstLoader" then
+    local ver = launcher.state and launcher.state.version
+    local name = (ver and ver.name) or ""
+    if name == "" or name == "未选择版本" then
+      launcher.view("vsInstHintText"):setText("请先在启动页选择或安装一个版本，再使用「安装加载器 / 补全文件」。")
+      return
+    end
+    launcher.view("vsInstHintText"):setText("正在打开引擎原生安装页（" .. tostring(name) .. "）…")
+    launcher.service("loader", "install", { version = name })
+    return
+  end
+  local vmt = base:match("^vsMod_T_(%d+)$")
+  if vmt then launcher.service("mods", "toggle", { index = tonumber(vmt) - 1 }) refreshMods() return end
+  local vmx = base:match("^vsMod_X_(%d+)$")
+  if vmx then launcher.service("mods", "delete", { index = tonumber(vmx) - 1 }) refreshMods() return end
+  local vst = base:match("^vsShade_T_(%d+)$")
+  if vst then launcher.service("shaders", "toggle", { index = tonumber(vst) - 1 }) refreshShadersInto("vsShade_", "vsShade_Empty") return end
+  local vsx = base:match("^vsShade_X_(%d+)$")
+  if vsx then launcher.service("shaders", "delete", { index = tonumber(vsx) - 1 }) refreshShadersInto("vsShade_", "vsShade_Empty") return end
+  local vrt = base:match("^vsRp_T_(%d+)$")
+  if vrt then launcher.service("resourcepacks", "toggle", { index = tonumber(vrt) - 1 }) refreshPacksInto("vsRp_", "vsRp_Empty") return end
+  local vrx = base:match("^vsRp_X_(%d+)$")
+  if vrx then launcher.service("resourcepacks", "delete", { index = tonumber(vrx) - 1 }) refreshPacksInto("vsRp_", "vsRp_Empty") return end
+  if base == "vsModRefresh" then launcher.service("mods", "refresh", {}) refreshMods() return end
+  if base == "vsShadeRefresh" then launcher.service("shaders", "refresh", {}) refreshShadersInto("vsShade_", "vsShade_Empty") return end
+  if base == "vsRpRefresh" then launcher.service("resourcepacks", "refresh", {}) refreshPacksInto("vsRp_", "vsRp_Empty") return end
+  if base == "vsShotsRefresh" then refreshFilesInto("vsShot_", "screenshots", "png,jpg,jpeg", "vsShot_Empty", "当前版本暂无截图。") return end
+  if base == "vsLitRefresh" then refreshFilesInto("vsLit_", "schematics", "litematic,schem,schematic,nbt", "vsLit_Empty", "当前版本暂无投影文件。") return end
   if base == "vsDeleteTop" then launcher.service("versionSettings", "delete", {}) return end
 
   -- ===== 二级管理页：版本管理 / 账号管理 / 游戏目录 =====
