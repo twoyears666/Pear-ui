@@ -13,7 +13,7 @@
 -- 结构约定（PLUIShellViewController.showLuaPage 依赖）：CONFIG.pages 的 token → 内容区页节点 id。
 
 function describe()
-  return { name = "PCL 浅色", version = "1.26.0-beta" }
+  return { name = "PCL 浅色", version = "1.27.0-beta" }
 end
 
 local C = {
@@ -439,11 +439,27 @@ local CAPS = { "mojang", "microsoft", "offline" }
 local CAPS_LABEL = { "Mojang", "微软", "离线" }
 
 -- ===== 启动页 =====
+-- 头像：登录后按账号名取 Minecraft 皮肤头像（引擎负责下载与缓存，脚本只给 URL），未登录回退 SF 占位图标
+local function refreshAvatar(name)
+  local img = launcher.view("avatar")
+  if not img then return end
+  local account = ""
+  if type(name) == "string" and name ~= "" and name ~= "未登录" then
+    account = (name:gsub("[^%w_]", ""))
+  end
+  if account ~= "" then
+    img:setImage("https://mc-heads.net/avatar/" .. account .. "/100")
+  else
+    img:setImage("sf:person.crop.square.fill")
+  end
+end
+
 -- 账号名 / 当前版本文本刷新（引擎 state 变更时调用）
 local function refreshAccount()
   local acc = launcher.state and launcher.state.account
   local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
   if launcher.view("accountName") then launcher.view("accountName"):setText(name) end
+  refreshAvatar(name)
 end
 
 local function refreshVersion()
@@ -476,6 +492,7 @@ local function selectCap(idx)
   local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
   if launcher.view("accountName") then launcher.view("accountName"):setText(name) end
   if launcher.view("accountType") then launcher.view("accountType"):setText(CAPS_LABEL[idx]) end
+  refreshAvatar(name)
 end
 
 local function buildHomeSidebar()
@@ -1936,6 +1953,7 @@ end
 function onAccountChange(account)
   if type(account) ~= "table" then return end
   if launcher.view("accountName") then launcher.view("accountName"):setText(account.name or "未登录") end
+  refreshAvatar(account.name)
 end
 
 function onOpenSubpage(token)
