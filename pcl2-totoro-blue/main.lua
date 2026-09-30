@@ -94,15 +94,15 @@ local CONFIG = {
   download = {
     -- 左栏 3 组：游戏 / 社区资源 / 安装
     sidebarGroups = {
-      { name = "游戏", items = {
-        { id = "Download.Left.Minecraft", label = "原版游戏", icon = "sf:cube.fill", kind = "mc", key = "vanilla" },
+      { items = {
+        { id = "Download.Left.Minecraft", label = "Minecraft", icon = "sf:cube.fill", kind = "mc", key = "vanilla" },
       } },
       { name = "社区资源", items = {
         { id = "dlCat_mod",          label = "Mod",     icon = "sf:puzzlepiece.extension.fill", kind = "comm",  key = "mod" },
         { id = "dlCat_modpack",      label = "整合包",  icon = "sf:shippingbox.fill",            kind = "comm",  key = "modpack" },
         { id = "dlCat_datapack",     label = "数据包",  icon = "sf:doc.text.fill",               kind = "comm",  key = "datapack" },
         { id = "dlCat_resourcepack", label = "资源包",  icon = "sf:photo.fill",                  kind = "comm",  key = "resourcepack" },
-        { id = "dlCat_shader",       label = "光影",    icon = "sf:sun.max.fill",                kind = "comm",  key = "shader" },
+        { id = "dlCat_shader",       label = "光影包",  icon = "sf:sun.max.fill",                kind = "comm",  key = "shader" },
         { id = "dlCat_world",        label = "世界",    icon = "sf:globe",                       kind = "world",    key = "world" },
         { id = "dlCat_favorite",     label = "收藏",    icon = "sf:star.fill",                   kind = "favorite", key = "favorite" },
       } },
