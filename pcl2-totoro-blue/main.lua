@@ -1,8 +1,8 @@
 -- Pear 启动器 · 仿 PCL 浅色 UI 包 —— 结构对齐真实 PCL2（PCL-CE）
 --
--- 页面（顶栏 5 页签）：启动 / 下载 / 联机 / 设置 / 更多
---   启动页可跳转的子页（下载 / 设置 / 联机 / 更多 / 版本设置 / 版本管理 / 账号管理 / 游戏目录）
---   均按真实 PCL2（PCL-CE）结构重写。
+-- 页面（顶栏 4 页签，对齐 PCL2 真机截图）：启动 / 下载 / 设置 / 更多
+--   二级页（版本设置 / 版本选择 / 账号管理 / 游戏目录 / 联机）顶栏替换为「← + 页标题」。
+--   启动页可跳转的子页均按真实 PCL2 结构重写；左栏含「启动中」进度第二态。
 --
 -- 契约（引擎通用，零特例）：
 --   主题：仿 PCL 浅色——蓝顶栏 topbar、内容区浅蓝灰渐变、白卡、深色字；禁止深色/透明兜底。
@@ -13,7 +13,7 @@
 -- 结构约定（PLUIShellViewController.showLuaPage 依赖）：CONFIG.pages 的 token → 内容区页节点 id。
 
 function describe()
-  return { name = "PCL 浅色", version = "1.27.0-beta" }
+  return { name = "PCL 浅色", version = "1.28.0-beta" }
 end
 
 local C = {
@@ -52,17 +52,33 @@ local SHADOW   = { blur = "0.3vh", opacity = 0.07, x = 0, y = "0.15vh" }
 
 local SECTION_W = "94%" -- 内容区左右各留 3%
 
--- 顶栏 5 页签（与回退后 HEAD 完全一致：启动 / 下载 / 联机 / 设置 / 更多）
+-- 顶栏 4 页签（对齐 PCL2 真机截图：启动 / 下载 / 设置 / 更多；联机不再是顶栏页签）
 local TABS = {
-  { id = "tab.home",     label = "启动", icon = "sf:house.fill",                             action = "open:home",       page = "home" },
-  { id = "tab.download", label = "下载", icon = "sf:arrow.down.circle.fill",                 action = "open:download",   page = "download" },
-  { id = "tab.multi",    label = "联机", icon = "sf:antenna.radiowaves.left.and.right",      action = "open:multi",      page = "multi" },
-  { id = "tab.setup",    label = "设置", icon = "sf:gearshape.fill",                         action = "open:settings",   page = "settings" },
-  { id = "tab.other",    label = "更多", icon = "sf:ellipsis.circle.fill",                   action = "open:more",       page = "more" },
+  { id = "tab.home",     label = "启动", icon = "sf:play.fill",                        action = "open:home",       page = "home" },
+  { id = "tab.download", label = "下载", icon = "sf:arrow.down.circle.fill",           action = "open:download",   page = "download" },
+  { id = "tab.setup",    label = "设置", icon = "sf:gearshape.fill",                   action = "open:settings",   page = "settings" },
+  { id = "tab.other",    label = "更多", icon = "sf:square.grid.2x2.fill",             action = "open:more",       page = "more" },
 }
 local PAGE_TAB = {
-  home = "tab.home", download = "tab.download", multi = "tab.multi",
+  home = "tab.home", download = "tab.download",
   settings = "tab.setup", more = "tab.other",
+}
+
+-- 二级页（非顶栏页签）：顶栏替换为「← + 页标题」（对齐 PCL2 FormMain.PanTitleInner）
+--   value = 页标题；BACK = 返回目标页
+local SECONDARY = {
+  multi            = "联机",
+  version_settings = "版本设置",
+  versionManager   = "版本选择",
+  accountManager   = "账号管理",
+  gameDirectory    = "游戏目录",
+}
+local BACK = {
+  multi            = "more",
+  version_settings = "home",
+  versionManager   = "home",
+  accountManager   = "home",
+  gameDirectory    = "settings",
 }
 
 local CONFIG = {
@@ -162,17 +178,19 @@ local CONFIG = {
   },
   -- 版本设置页：左栏 2 组 11 项
   versions = {
+    -- 首组对齐 PCL2 真机：概览 / 设置 / Mod 管理 / 导出（无组标题）
+    -- 其余资源类页放在「资源」分组内，保证功能完整且不影响首屏与真机一致
     groups = {
-      { name = "游戏", items = {
-        { key = "info",    label = "概览", icon = "sf:info.circle.fill" },
-        { key = "launch",  label = "设置", icon = "sf:play.fill" },
-        { key = "install", label = "安装", icon = "sf:arrow.down.circle.fill" },
-        { key = "export",  label = "导出", icon = "sf:square.and.arrow.up" },
+      { items = {
+        { key = "info",   label = "概览",    icon = "sf:info.circle.fill" },
+        { key = "launch", label = "设置",    icon = "sf:play.fill" },
+        { key = "mods",   label = "Mod 管理", icon = "sf:puzzlepiece.extension.fill" },
+        { key = "export", label = "导出",    icon = "sf:square.and.arrow.up" },
       } },
       { name = "资源", items = {
+        { key = "install",    label = "安装",   icon = "sf:arrow.down.circle.fill" },
         { key = "saves",      label = "存档",   icon = "sf:folder.fill" },
         { key = "shots",      label = "截图",   icon = "sf:camera.fill" },
-        { key = "mods",       label = "Mod",    icon = "sf:puzzlepiece.extension.fill" },
         { key = "rp",         label = "资源包", icon = "sf:photo.fill" },
         { key = "shaders",    label = "光影",   icon = "sf:sun.max.fill" },
         { key = "litematica", label = "投影",   icon = "sf:square.grid.3x3.fill" },
@@ -327,7 +345,9 @@ end
 local function sidebarFromGroups(prefix, groups)
   local kids = {}
   for _, g in ipairs(groups) do
-    kids[#kids + 1] = ui.text { text = g.name, width = "100%", style = { font = "2.1vh", color = C.mid } }
+    if g.name then
+      kids[#kids + 1] = ui.text { text = g.name, width = "100%", style = { font = "2.1vh", color = C.mid } }
+    end
     for _, it in ipairs(g.items) do
       kids[#kids + 1] = sidebarItem(prefix .. it.key, it.icon, it.label, prefix .. it.key)
     end
@@ -434,9 +454,10 @@ local commDownloading = false
 local homeItems = {}
 local langIdx = 1
 local LANGS = { "简体中文", "English", "日本語" }
-local selectedCap = 3
-local CAPS = { "mojang", "microsoft", "offline" }
-local CAPS_LABEL = { "Mojang", "微软", "离线" }
+local selectedCap = 1
+-- PCL2 启动页仅两枚登录方式胶囊：正版 / 离线
+local CAPS = { "auth", "offline" }
+local CAPS_LABEL = { "正版", "离线" }
 
 -- ===== 启动页 =====
 -- 头像：登录后按账号名取 Minecraft 皮肤头像（引擎负责下载与缓存，脚本只给 URL），未登录回退 SF 占位图标
@@ -457,7 +478,7 @@ end
 -- 账号名 / 当前版本文本刷新（引擎 state 变更时调用）
 local function refreshAccount()
   local acc = launcher.state and launcher.state.account
-  local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
+  local name = (type(acc) == "table" and acc.name) and acc.name or "添加新账号"
   if launcher.view("accountName") then launcher.view("accountName"):setText(name) end
   refreshAvatar(name)
 end
@@ -489,25 +510,21 @@ local function selectCap(idx)
       or { background = C.card, tint = C.accent, borderWidth = 1.5, borderColor = C.accent })
   end
   local acc = launcher.state and launcher.state.account
-  local name = (type(acc) == "table" and acc.name) and acc.name or "未登录"
+  local name = (type(acc) == "table" and acc.name) and acc.name or "添加新账号"
   if launcher.view("accountName") then launcher.view("accountName"):setText(name) end
-  if launcher.view("accountType") then launcher.view("accountType"):setText(CAPS_LABEL[idx]) end
   refreshAvatar(name)
 end
 
 local function buildHomeSidebar()
   local kids = {}
   kids[#kids + 1] = ui.spacer { height = "2.5vh" }
-  -- 账号类型胶囊：Mojang / 微软 / 离线（PCL2 为三态 pill）
-  kids[#kids + 1] = ui.row { id = "capsules", width = "90%", height = "4vh", spacing = "1vh",
+  -- 登录方式胶囊：正版 / 离线（PCL2 双态 pill，选中 = 蓝色实底白字 + 勾）
+  kids[#kids + 1] = ui.row { id = "capsules", width = "90%", height = "4.2vh", spacing = "1.2vh",
     children = {
-      ui.button { id = "cap.mojang", label = "Mojang", height = "4vh", weight = 1, corner = "pill",
-        action = "cap.mojang", hoverColor = C.hover,
+      ui.button { id = "cap.auth", label = "正版", height = "4.2vh", weight = 1, corner = "pill",
+        action = "cap.auth", hoverColor = C.hover,
         style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
-      ui.button { id = "cap.microsoft", label = "微软", height = "4vh", weight = 1, corner = "pill",
-        action = "cap.microsoft", hoverColor = C.hover,
-        style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
-      ui.button { id = "cap.offline", label = "离线", height = "4vh", weight = 1, corner = "pill",
+      ui.button { id = "cap.offline", label = "离线", height = "4.2vh", weight = 1, corner = "pill",
         action = "cap.offline", hoverColor = C.hover,
         style = { background = C.card, tint = C.accent, font = "2.2vh", weight = "bold" } },
     } }
@@ -519,23 +536,28 @@ local function buildHomeSidebar()
       ui.image { id = "avatar", icon = "sf:person.crop.square.fill", size = "10vh",
         background = C.transparent, style = { tint = C.avatarLine } },
     } }
-  kids[#kids + 1] = ui.spacer { height = "1.5vh" }
-  kids[#kids + 1] = ui.text { id = "accountName", text = "未登录", width = "90%",
-    style = { font = "2.4vh", weight = "bold", color = C.dark } }
-  kids[#kids + 1] = ui.text { id = "accountType", text = "点击登录账号", width = "90%",
-    style = { font = "2vh", color = C.mid } }
-  kids[#kids + 1] = ui.spacer { height = "1.8vh" }
-  -- 登录 / 管理账号（进入账号管理二级页）
-  kids[#kids + 1] = ui.button { id = "loginBtn", label = "登录 / 管理账号", width = "90%", height = "5vh",
-    background = C.accent, corner = "0.8vh", action = "open:accountManager",
-    style = { font = "2.3vh", weight = "bold", tint = C.white } }
-  kids[#kids + 1] = ui.row { id = "homeLinks", width = "90%", height = "4vh", crossAlign = "center", spacing = "1vh",
+  kids[#kids + 1] = ui.spacer { height = "2vh" }
+  -- 账号行：下拉「添加新账号」+ 蓝色「登录」按钮（对齐 PCL2 左栏）
+  kids[#kids + 1] = ui.row { id = "accountRow", width = "90%", height = "5vh", crossAlign = "center", spacing = "1.2vh",
     children = {
-      ui.button { id = "linkBuy", label = "购买正版", weight = 1, height = "4vh", corner = "pill",
+      ui.row { id = "accountPick", height = "5vh", weight = 1, background = C.card, border = BORDER,
+        corner = "0.8vh", crossAlign = "center", hoverColor = C.hover, action = "open:accountManager",
+        padding = { left = "1.2vh", right = "1.2vh" }, children = {
+          ui.text { id = "accountName", text = "添加新账号", weight = 1, style = { font = "2.3vh", color = C.dark } },
+          ui.text { text = " ▾", style = { font = "2.3vh", color = C.mid } },
+        } },
+      ui.button { id = "loginBtn", label = "登录", width = "12vh", height = "5vh", corner = "0.8vh",
+        action = "open:accountManager", style = { font = "2.4vh", weight = "bold", tint = C.white,
+          background = C.accent } },
+    } }
+  -- 文字链：› 购买正版 / › 前往官网
+  kids[#kids + 1] = ui.row { id = "homeLinks", width = "90%", height = "4vh", crossAlign = "center", spacing = "0.6vh",
+    children = {
+      ui.button { id = "linkBuy", label = "› 购买正版", weight = 1, height = "4vh", corner = "pill",
         action = "open:download", hoverColor = C.hover,
         style = { background = C.transparent, tint = C.mid, font = "1.9vh" } },
-      ui.button { id = "linkSkin", label = "更换皮肤", weight = 1, height = "4vh", corner = "pill",
-        action = "open:settings", hoverColor = C.hover,
+      ui.button { id = "linkSkin", label = "› 前往官网", weight = 1, height = "4vh", corner = "pill",
+        action = "open:more", hoverColor = C.hover,
         style = { background = C.transparent, tint = C.mid, font = "1.9vh" } },
     } }
   kids[#kids + 1] = ui.spacer { height = "2vh" }
@@ -559,7 +581,57 @@ local function buildHomeSidebar()
         style = { background = C.card, tint = C.dark, font = "2.4vh", weight = "bold" } },
     } }
   kids[#kids + 1] = ui.spacer { height = "2vh" }
-  return kids
+  -- 左栏第二态：启动中（对齐 PCL2 PageLaunchLeft.PanLaunching，与常规账号区互斥显示）
+  local lch = {}
+  lch[#lch + 1] = ui.spacer { height = "3vh" }
+  lch[#lch + 1] = ui.image { id = "lchSpinner", icon = "sf:arrow.triangle.2.circlepath", size = "9vh",
+    corner = "pill", background = C.faintBlue, style = { tint = C.accent } }
+  lch[#lch + 1] = ui.text { text = "正在启动游戏", width = "90%", style = { font = "3vh", weight = "bold", color = C.dark } }
+  lch[#lch + 1] = ui.text { id = "lchName", text = "尚未选择版本", width = "90%", style = { font = "2.4vh", color = C.mid } }
+  lch[#lch + 1] = ui.spacer { height = "1vh" }
+  lch[#lch + 1] = ui.column { id = "lchBarBox", width = "90%", crossAlign = "stretch", spacing = "1vh", children = {
+    makeBar("lchBarTrack", "lchBarFill"),
+    ui.text { id = "lchPct", text = "0%", width = "100%", style = { font = "2.2vh", color = C.dark } },
+  } }
+  local function lchInfo(label, id, def)
+    return ui.row { width = "90%", height = "4.6vh", crossAlign = "center", spacing = "1.2vh", children = {
+      ui.text { text = label, weight = 1, style = { font = "2.2vh", color = C.mid } },
+      ui.text { id = id, text = def, style = { font = "2.2vh", color = C.dark } },
+    } }
+  end
+  lch[#lch + 1] = lchInfo("当前步骤", "lchStep", "准备中")
+  lch[#lch + 1] = lchInfo("下载支持", "lchSupport", "···")
+  lch[#lch + 1] = lchInfo("登录方式", "lchLogin", "离线登录")
+  lch[#lch + 1] = lchInfo("下载速度", "lchSpeed", "···")
+  lch[#lch + 1] = ui.spacer { weight = 1 }
+  lch[#lch + 1] = ui.button { id = "lchCancel", label = "取消", width = "90%", height = "5.5vh",
+    corner = "0.8vh", border = BORDER, action = "lchCancel", hoverColor = C.hover,
+    style = { background = C.card, tint = C.dark, font = "2.4vh", weight = "bold" } }
+  lch[#lch + 1] = ui.spacer { height = "2vh" }
+  return {
+    ui.column { id = "homeNormal", width = "100%", weight = 1, crossAlign = "center", spacing = "0.4vh", children = kids },
+    ui.column { id = "homeLaunching", width = "100%", weight = 1, crossAlign = "center", spacing = "1.4vh",
+      visible = false, children = lch },
+  }
+end
+
+-- 启动中态切换（PCL2：启动时左栏切换为进度视图，可取消）
+local launching = false
+local function setLaunching(on)
+  launching = on and true or false
+  local ver = launcher.state and launcher.state.version
+  local nm = (type(ver) == "table" and ver.name) or "尚未选择版本"
+  if launcher.view("homeNormal") then launcher.view("homeNormal"):setVisible(not launching) end
+  if launcher.view("homeLaunching") then launcher.view("homeLaunching"):setVisible(launching) end
+  if launching then
+    if launcher.view("lchName") then launcher.view("lchName"):setText(nm) end
+    if launcher.view("lchPct") then launcher.view("lchPct"):setText("0%") end
+    if launcher.view("lchStep") then launcher.view("lchStep"):setText("准备中") end
+    if launcher.view("lchLogin") then
+      launcher.view("lchLogin"):setText(CAPS_LABEL[selectedCap] or "离线")
+    end
+    updateBar("lchBarTrack", "lchBarFill", 0)
+  end
 end
 
 -- ============ 启动页右区（仿 PCL2 主页右侧大公告卡片）============
@@ -1217,7 +1289,7 @@ local function buildMorePage()
   sec("mp.hall", { card("mpHallCard", {
     hintRow("mpHallHintRow", "mpHallStatus", CONFIG.online.statusPreset),
     navRow("mpHallOpen", "进入联机大厅", "局域网 / 在线房间", "open:multi"),
-    ui.text { id = "mpHallNote", text = "房间列表、创建与加入均在顶栏「联机」页中操作。",
+    ui.text { id = "mpHallNote", text = "房间列表、创建与加入均在「联机」页中操作，可用顶栏「←」返回本页。",
       width = "100%", style = { font = "2.2vh", color = C.mid } },
   }, { spacing = "1.4vh" }) })
 
@@ -1873,11 +1945,19 @@ function build(ui)
       ui.row { id = "titlebar", height = "8.5vh",
         background = { from = C.topbarFrom, to = C.topbarTo, angle = 90 }, crossAlign = "center",
         padding = { left = "1.4vh", right = "1.5vh" }, children = {
-          ui.row { id = "logoBadge", corner = "0.7vh", background = C.white, crossAlign = "center",
-            padding = { left = "0.9vh", right = "0.9vh", top = "0.35vh", bottom = "0.35vh" }, children = {
-              ui.text { id = "logo", text = "PCL", style = { font = "2.7vh", weight = "bold", color = C.topbarTo } },
-            } },
-          ui.text { id = "logoII", text = "II", style = { font = "2.3vh", weight = "bold", color = C.white } },
+          ui.row { id = "mainBrand", crossAlign = "center", spacing = "0.6vh", children = {
+            ui.row { id = "logoBadge", corner = "0.7vh", background = C.white, crossAlign = "center",
+              padding = { left = "0.9vh", right = "0.9vh", top = "0.35vh", bottom = "0.35vh" }, children = {
+                ui.text { id = "logo", text = "PCL", style = { font = "2.7vh", weight = "bold", color = C.topbarTo } },
+              } },
+            ui.text { id = "logoII", text = "II", style = { font = "2.3vh", weight = "bold", color = C.white } },
+          } },
+          ui.row { id = "innerLeft", crossAlign = "center", spacing = "1.2vh", visible = false, children = {
+            ui.button { id = "backArrow", label = "←", width = "6vh", height = "5.6vh", corner = "pill",
+              action = "navBack", hoverColor = C.hover,
+              style = { background = C.transparent, tint = C.white, font = "3.2vh", weight = "bold" } },
+            ui.text { id = "innerTitle", text = "", style = { font = "2.8vh", weight = "bold", color = C.white } },
+          } },
           ui.spacer { weight = 1 },
           ui.row { id = "tabs", spacing = "5vh", crossAlign = "center", children = (function()
             local nodes = {}
@@ -1911,6 +1991,24 @@ local function selectTab(tabId)
     launcher.view(t.id):setStyle(sel
       and { background = C.card, tint = C.accent, corner = "pill" }
       or { background = C.transparent, tint = C.white, corner = "pill" })
+  end
+end
+
+-- 顶栏形态：主页面 = 品牌 + 页签；二级页 = 「← + 标题」（对齐 PCL2 PanTitleInner）
+local function applyTopbar(page)
+  local title = SECONDARY[page]
+  local isSec = title ~= nil
+  if launcher.view("mainBrand") then launcher.view("mainBrand"):setVisible(not isSec) end
+  if launcher.view("innerLeft") then launcher.view("innerLeft"):setVisible(isSec) end
+  if launcher.view("tabs") then launcher.view("tabs"):setVisible(not isSec) end
+  if isSec then
+    local full = title
+    if page == "version_settings" then
+      local ver = launcher.state and launcher.state.version
+      local nm = (type(ver) == "table" and ver.name) or nil
+      if nm and nm ~= "" then full = title .. " - " .. nm end
+    end
+    if launcher.view("innerTitle") then launcher.view("innerTitle"):setText(full) end
   end
 end
 
@@ -2001,6 +2099,7 @@ function onPageChange(page)
   elseif page == "gameDirectory" then
     refreshGdm()
   end
+  applyTopbar(page)
   local tabId = PAGE_TAB[page]
   if tabId then selectTab(tabId) end
 end
@@ -2015,6 +2114,23 @@ function onDownloadUpdate(payload)
   if launcher.view("dlProgressLabel") then
     launcher.view("dlProgressLabel"):setText(p.finished and ("安装完成（" .. pct .. "%）") or ("下载中 " .. pct .. "%…"))
   end
+  -- 启动中态：同一进度同时驱动左栏「正在启动游戏」视图
+  if launching then
+    updateBar("lchBarTrack", "lchBarFill", pct)
+    if launcher.view("lchPct") then launcher.view("lchPct"):setText(pct .. "%") end
+    if launcher.view("lchStep") then
+      launcher.view("lchStep"):setText(p.finished and "启动中" or (p.step or "下载资源"))
+    end
+    if launcher.view("lchSupport") and p.support then launcher.view("lchSupport"):setText(tostring(p.support)) end
+    if launcher.view("lchSpeed") and p.speed then launcher.view("lchSpeed"):setText(tostring(p.speed)) end
+  end
+end
+
+-- 游戏启动结束（成功/失败/取消）：退出启动中态
+function onLaunchFinished(payload)
+  if not launching then return end
+  setLaunching(false)
+  refreshVersion()
 end
 
 function onDownloadFinished(payload)
@@ -2132,9 +2248,16 @@ function onClick(id)
   if type(id) ~= "string" then return end
   launcher.log("[Lua.onClick] id=" .. id)
   for _, t in ipairs(TABS) do if t.id == id then selectTab(t.id) return end end
-  if id == "cap.mojang" then selectCap(1) return end
-  if id == "cap.microsoft" then selectCap(2) return end
-  if id == "cap.offline" then selectCap(3) return end
+  if id == "backArrow" then
+    local target = BACK[currentPage]
+    if target then launcher.action("open:" .. target) end
+    return
+  end
+  if id == "cap.auth" then selectCap(1) return end
+  if id == "cap.offline" then selectCap(2) return end
+  -- 启动中态（左栏进度视图）：点击「启动游戏」进入，点击「取消」退出
+  if id == "launchBtn" or id == "launchTitle" or id == "launchSub" then setLaunching(true) return end
+  if id == "lchCancel" then setLaunching(false) return end
 
   local base = baseId(id)
 
