@@ -454,6 +454,15 @@ local commDownloading = false
 local homeItems = {}
 local langIdx = 1
 local LANGS = { "简体中文", "English", "日本語" }
+-- 启动页右侧「你知道吗？」轮播文案（PCL2 默认主页预设）
+local NOTICE_TIPS = {
+  "欢迎使用 Pear 启动器。",
+  "在左侧切换「正版 / 离线」即可选择不同的登录方式。",
+  "点击「版本选择」可安装新版本或切换已安装版本。",
+  "「版本设置 → Mod 管理」可搜索、安装与启停 Mod。",
+  "设置页「个性化」可切换界面主题与引擎原生页入口。",
+}
+local noticeIdx = 1
 local selectedCap = 1
 -- PCL2 启动页仅两枚登录方式胶囊：正版 / 离线
 local CAPS = { "auth", "offline" }
@@ -639,21 +648,21 @@ local function buildHomePage()
   return ui.column { id = "pageHome", weight = 1, crossAlign = "center", padding = "1.6vh",
     spacing = "1.6vh",
     children = {
+      -- 右侧自定义主页卡：对齐 PCL2 默认预设「你知道吗？」（标题左侧 + 右上刷新按钮）
       section("homeNotice", { card("homeNoticeCard", {
         ui.row { width = "100%", height = "5vh", crossAlign = "center", spacing = "1.5vh",
           children = {
-            ui.image { icon = "sf:info.circle.fill", size = "4vh", corner = "pill",
-              background = C.faintBlue, style = { tint = C.accent } },
-            ui.text { text = "公告", style = { font = "2.8vh", weight = "bold", color = C.dark } },
+            ui.text { text = "你知道吗？", weight = 1, style = { font = "2.8vh", weight = "bold", color = C.dark } },
+            ui.button { id = "homeNoticeRefresh", label = "换一条", width = "14vh", height = "4.4vh",
+              corner = "pill", action = "homeNoticeRefresh", hoverColor = C.hover,
+              style = { background = C.faintBlue, tint = C.accent, font = "2.1vh", weight = "bold" } },
           } },
         ui.divider { height = "0.2vh", background = C.cardBorder },
-        ui.text { text = "欢迎使用 Pear 启动器。", width = "100%", style = { font = "2.4vh", color = C.dark } },
-        ui.text { text = "· 在左侧选择账号类型并登录。", width = "100%", style = { font = "2.2vh", color = C.mid } },
+        ui.text { id = "homeNoticeText", text = "欢迎使用 Pear 启动器。", width = "100%",
+          style = { font = "2.5vh", color = C.dark } },
+        ui.text { text = "· 在左侧选择登录方式并登录账号。", width = "100%", style = { font = "2.2vh", color = C.mid } },
         ui.text { text = "· 点击「版本选择」安装或切换游戏版本。", width = "100%", style = { font = "2.2vh", color = C.mid } },
         ui.text { text = "· 点击「启动游戏」即可开始游玩。", width = "100%", style = { font = "2.2vh", color = C.mid } },
-        ui.button { id = "homeNoticeBtn", label = "了解更多", width = "28vh", height = "5vh",
-          background = C.accent, corner = "0.8vh", action = "open:more",
-          style = { font = "2.3vh", weight = "bold", tint = C.white } },
       }, { spacing = "2vh" }) }),
     } }
 end
@@ -1945,12 +1954,9 @@ function build(ui)
       ui.row { id = "titlebar", height = "8.5vh",
         background = { from = C.topbarFrom, to = C.topbarTo, angle = 90 }, crossAlign = "center",
         padding = { left = "1.4vh", right = "1.5vh" }, children = {
-          ui.row { id = "mainBrand", crossAlign = "center", spacing = "0.6vh", children = {
-            ui.row { id = "logoBadge", corner = "0.7vh", background = C.white, crossAlign = "center",
-              padding = { left = "0.9vh", right = "0.9vh", top = "0.35vh", bottom = "0.35vh" }, children = {
-                ui.text { id = "logo", text = "PCL", style = { font = "2.7vh", weight = "bold", color = C.topbarTo } },
-              } },
-            ui.text { id = "logoII", text = "II", style = { font = "2.3vh", weight = "bold", color = C.white } },
+          -- 品牌：真机顶栏左上为白色粗体「PCL」纯文字（无白色底徽章）
+          ui.row { id = "mainBrand", crossAlign = "center", children = {
+            ui.text { id = "logo", text = "PCL", style = { font = "3.2vh", weight = "bold", color = C.white } },
           } },
           ui.row { id = "innerLeft", crossAlign = "center", spacing = "1.2vh", visible = false, children = {
             ui.button { id = "backArrow", label = "←", width = "6vh", height = "5.6vh", corner = "pill",
@@ -2258,6 +2264,11 @@ function onClick(id)
   -- 启动中态（左栏进度视图）：点击「启动游戏」进入，点击「取消」退出
   if id == "launchBtn" or id == "launchTitle" or id == "launchSub" then setLaunching(true) return end
   if id == "lchCancel" then setLaunching(false) return end
+  if id == "homeNoticeRefresh" then
+    noticeIdx = (noticeIdx % #NOTICE_TIPS) + 1
+    if launcher.view("homeNoticeText") then launcher.view("homeNoticeText"):setText(NOTICE_TIPS[noticeIdx]) end
+    return
+  end
 
   local base = baseId(id)
 
