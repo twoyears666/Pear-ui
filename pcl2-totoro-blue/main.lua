@@ -13,7 +13,7 @@
 -- 结构约定（PLUIShellViewController.showLuaPage 依赖）：CONFIG.pages 的 token → 内容区页节点 id。
 
 function describe()
-  return { name = "PCL 浅色", version = "1.28.0-beta" }
+  return { name = "PCL 浅色", version = "1.29.0-beta" }
 end
 
 local C = {
@@ -277,8 +277,10 @@ local function navRow(id, label, sub, action)
   }
   if sub then kids[#kids + 1] = ui.text { text = sub, style = { font = "2.1vh", color = C.mid } } end
   kids[#kids + 1] = chevron()
-  return ui.row { id = id, height = "6.5vh", width = "100%", crossAlign = "center", spacing = "1.2vh",
-    hoverColor = C.hover, action = action, padding = { left = "1.2vh", right = "1.2vh" }, children = kids }
+  return ui.row { id = id, height = "7vh", width = "100%", crossAlign = "center", spacing = "1.2vh",
+    background = C.card, border = BORDER, corner = "1.2vh", shadow = SHADOW,
+    hoverColor = C.hover, action = action,
+    padding = { left = "1.8vh", right = "1.8vh", top = "0.4vh", bottom = "0.4vh" }, children = kids }
 end
 
 local function plainButton(id, label, accent, action)
@@ -1761,14 +1763,6 @@ local MANAGER_SLOTS = 8
 
 local function buildVersionManagerPage()
   local kids = {
-    ui.row { id = "vmHeader", width = SECTION_W, height = "6vh", crossAlign = "center", spacing = "1.5vh",
-      children = {
-        ui.button { id = "vmBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
-          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
-          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
-        ui.text { text = CONFIG.versionManager.title, weight = 1,
-          style = { font = "3vh", weight = "bold", color = C.dark } },
-      } },
     hintRow("vmHintRow", "vmHint", "点击某个版本即可切换当前使用的游戏版本。"),
   }
   for i = 1, MANAGER_SLOTS do
@@ -1798,14 +1792,6 @@ end
 
 local function buildAccountManagerPage()
   local kids = {
-    ui.row { id = "amHeader", width = SECTION_W, height = "6vh", crossAlign = "center", spacing = "1.5vh",
-      children = {
-        ui.button { id = "amBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
-          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
-          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
-        ui.text { text = CONFIG.accountManager.title, weight = 1,
-          style = { font = "3vh", weight = "bold", color = C.dark } },
-      } },
     hintRow("amHintRow", "amHint", "点击账号可切换当前使用的账号；登录由引擎原生账号页处理。"),
   }
   for i = 1, MANAGER_SLOTS do
@@ -1835,14 +1821,6 @@ end
 
 local function buildGameDirectoryPage()
   local kids = {
-    ui.row { id = "gdmHeader", width = SECTION_W, height = "6vh", crossAlign = "center", spacing = "1.5vh",
-      children = {
-        ui.button { id = "gdmBack", label = "‹ 返回", action = "open:home", width = "22%", height = "5vh",
-          background = C.card, border = BORDER, corner = "0.8vh", hoverColor = C.hover,
-          style = { font = "2.4vh", weight = "bold", tint = C.dark } },
-        ui.text { text = CONFIG.gameDirectory.title, weight = 1,
-          style = { font = "3vh", weight = "bold", color = C.dark } },
-      } },
     hintRow("gdmHintRow", "gdmHint", "点击「使用」切换当前游戏目录；可在下方输入名称新建目录。"),
   }
   for i = 1, MANAGER_SLOTS do
@@ -1959,9 +1937,9 @@ function build(ui)
             ui.text { id = "logo", text = "PCL", style = { font = "3.2vh", weight = "bold", color = C.white } },
           } },
           ui.row { id = "innerLeft", crossAlign = "center", spacing = "1.2vh", visible = false, children = {
-            ui.button { id = "backArrow", label = "←", width = "6vh", height = "5.6vh", corner = "pill",
+            ui.button { id = "backArrow", icon = "sf:chevron.left", width = "6vh", height = "5.6vh", corner = "pill",
               action = "navBack", hoverColor = C.hover,
-              style = { background = C.transparent, tint = C.white, font = "3.2vh", weight = "bold" } },
+              style = { background = C.transparent, tint = C.white, font = "3.2vh" } },
             ui.text { id = "innerTitle", text = "", style = { font = "2.8vh", weight = "bold", color = C.white } },
           } },
           ui.spacer { weight = 1 },
