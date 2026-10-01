@@ -16,7 +16,7 @@
 --   点击：引擎派发下划线形式的节点 id，onClick 用 string.match 剥后缀/前缀匹配。
 
 function describe()
-  return { name = "清风蓝调", version = "0.2.0-beta" }
+  return { name = "清风蓝调", version = "0.3.0-beta" }
 end
 
 -- ============ 颜色令牌 ============
@@ -327,7 +327,7 @@ end
 
 -- 胶囊选择标签
 local function pill(id, textId, label, selected)
-  return ui.row { id = id, corner = "pill", height = "5.4vh",
+  return ui.row { id = id, corner = DIM.cardRadius, height = "5.4vh",
     crossAlign = "center", justify = "center",
     padding = { left = "2.4vh", right = "2.4vh", top = "0.6vh", bottom = "0.6vh" },
     background = selected and C.card or C.card,
@@ -370,6 +370,20 @@ local function statusBar(barId, textId, text, width)
     } }
 end
 
+local function updateBar(trackId, fillId, pct)
+  pct = tonumber(pct) or 0
+  if pct < 0 then pct = 0 elseif pct > 100 then pct = 100 end
+  local tr = launcher.view(trackId)
+  if not tr then return end
+  local fr = tr:getFrame() or {}
+  local w = (tonumber(fr.w) or 0) * pct / 100
+  local h = tonumber(fr.h) or 1.4
+  if h <= 0 then h = 1.4 end
+  if launcher.view(fillId) then
+    launcher.view(fillId):setFrame({ x = 0, y = 0, w = w, h = h })
+  end
+end
+
 -- ============ 设置行（数据驱动，id 剥离后缀匹配）============
 local function settingsRow(s)
   local id = "set_" .. s.key
@@ -400,7 +414,7 @@ local function settingsRow(s)
           } },
       } }
   elseif s.type == "select" then
-    right = ui.row { id = id .. "_v", action = id .. "_v", corner = "pill",
+    right = ui.row { id = id .. "_v", action = id .. "_v", corner = DIM.cardRadius,
       padding = { left = "2.2vh", right = "2vh", top = "0.6vh", bottom = "0.6vh" },
       crossAlign = "center", spacing = "0.8vh", background = C.card, border = BORDER_A,
       hoverColor = C.hover, children = {
@@ -409,7 +423,7 @@ local function settingsRow(s)
         ui.image { icon = "sf:chevron.down", size = "2vh", style = { tint = C.accent } },
       } }
   elseif s.type == "button" then
-    right = ui.row { id = id .. "_btn", action = id .. "_btn", corner = "pill",
+    right = ui.row { id = id .. "_btn", action = id .. "_btn", corner = DIM.cardRadius,
       padding = { left = "2.6vh", right = "2.6vh", top = "0.6vh", bottom = "0.6vh" },
       background = C.card, border = BORDER_A, hoverColor = C.hover,
       children = { ui.text { text = "执行", style = { font = "2.3vh", color = C.accent } } } }
@@ -659,8 +673,9 @@ local function buildInstallWizard()
         ui.row { id = "dlProgress", width = "100%", visible = false, crossAlign = "center", spacing = "1vh",
           padding = "1vh", children = {
             ui.text { id = "dlProgressLabel", text = "", weight = 1, style = { font = "2.2vh", color = C.dark } },
-            ui.row { width = "40%", height = "1.4vh", corner = "pill", background = C.hintBg, children = {
-              ui.row { id = "dlBarFill", width = "0%", height = "100%", corner = "pill", background = C.accent, children = {} },
+            ui.row { id = "dlBarTrack", width = "40%", height = "1.4vh", corner = "pill", background = C.hintBg, children = {
+              ui.column { id = "dlBarFill", absolute = true, width = "0vh", height = "1.4vh",
+                corner = "pill", background = C.accent },
             } },
           } },
         ui.row { width = "100%", justify = "end", children = {
@@ -716,7 +731,7 @@ end
 local function buildMultiPage()
   local seg = {}
   for i, label in ipairs(CONFIG.multi.branches) do
-    seg[#seg + 1] = ui.row { id = "segM_" .. i, action = "segM_" .. i, corner = "pill", height = "5.6vh",
+    seg[#seg + 1] = ui.row { id = "segM_" .. i, action = "segM_" .. i, corner = DIM.cardRadius, height = "5.6vh",
       crossAlign = "center", justify = "center",
       padding = { left = "2.6vh", right = "2.6vh", top = "0.6vh", bottom = "0.6vh" },
       background = (i == 1) and C.faintBlue or C.card,
@@ -917,7 +932,7 @@ end
 local function buildVersionDetailPage()
   local loaderBtns = {}
   for li, lname in ipairs(CONFIG.download.loaders) do
-    loaderBtns[#loaderBtns + 1] = ui.row { id = "vdL_" .. li, action = "vdL_" .. li, corner = "pill", height = "5.6vh",
+    loaderBtns[#loaderBtns + 1] = ui.row { id = "vdL_" .. li, action = "vdL_" .. li, corner = DIM.cardRadius, height = "5.6vh",
       crossAlign = "center", justify = "center",
       padding = { left = "2.4vh", right = "2.4vh", top = "0.6vh", bottom = "0.6vh" },
       background = (li == 1) and C.faintBlue or C.card,
@@ -1234,7 +1249,7 @@ function onDownloadUpdate(payload)
   local done = p.downloaded or 0
   local total = p.total or 100
   local pct = (total > 0) and math.floor(done / total * 100) or 0
-  if launcher.view("dlBarFill") then launcher.view("dlBarFill"):setStyle({ width = pct .. "%" }) end
+  updateBar("dlBarTrack", "dlBarFill", pct)
   if launcher.view("dlProgressLabel") then
     launcher.view("dlProgressLabel"):setText(p.finished and ("安装完成（" .. pct .. "%）") or ("下载中 " .. pct .. "%…"))
   end
@@ -1283,6 +1298,10 @@ end
 function onCommunityProgress(payload) end
 
 function onCommunityKeyword(payload) end
+
+function onLaunchFinished(payload)
+  refreshVersion()
+end
 
 function onOpenSubpage(token)
   if CONFIG.pages[token] and launcher.action then launcher.action("open:" .. token) end
